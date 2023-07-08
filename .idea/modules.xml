@@ -2,6 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/cr_cpu_assembler/cr_cpu_assembler.iml" filepath="$PROJECT_DIR$/cr_cpu_assembler/cr_cpu_assembler.iml" />
+      <module fileurl="file://$PROJECT_DIR$/cr_cpu_emu/cr_cpu_emu.iml" filepath="$PROJECT_DIR$/cr_cpu_emu/cr_cpu_emu.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/cr_cpu_sim.iml" filepath="$PROJECT_DIR$/.idea/cr_cpu_sim.iml" />
     </modules>
   </component>
