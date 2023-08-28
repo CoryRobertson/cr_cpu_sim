@@ -7,6 +7,12 @@ pub const ADD: u8 = 0x0A;
 /// Uses same bit format as `ADD` at the moment
 pub const SUB: u8 = 0x0B;
 
+/// Push instruction
+pub const PUSH: u8 = 0x0C;
+
+/// Pop instruction
+pub const POP: u8 = 0x1C;
+
 pub const DUMP: u8 = 0xFF;
 
 pub const EMPTY_REGISTER: u32 = 0x00;

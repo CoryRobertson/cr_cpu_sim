@@ -1,32 +1,43 @@
-use crate::constants::{ADD, DUMP, SUB};
-use crate::instruction::Instruction::{Add, Dump, Sub, Unknown};
+use crate::constants::{ADD, DUMP, POP, PUSH, SUB};
+use crate::instruction::Instruction::{Add, Dump, Pop, Push, Sub, Unknown};
 use crate::mask_bit_group;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
+    /// |location unused|number|location unused|opcode|
+    /// add = |00000000|11111111|00000000|11111111|
     Add(u8),
+    /// |location unused|number|location unused|opcode|
+    /// sub = |00000000|11111111|00000000|11111111|
     Sub(u8),
+    Push(u16),
+    Pop,
     Dump,
     Unknown,
 }
 
 impl Instruction {
 
+    #[allow(unused_variables)]
     pub fn decode(instruction_data: u32) -> Self {
 
-        let byte = mask_bit_group(instruction_data,0);
+        let op_code = mask_bit_group(instruction_data, 0);
 
-        let num = mask_bit_group(instruction_data,2);
+        let group1 = mask_bit_group(instruction_data, 1);
+        let group2 = mask_bit_group(instruction_data, 2);
+        let group3 = mask_bit_group(instruction_data, 3);
 
         // println!("instruction data: {:#034b}", instruction_data);
         // println!("instruction byte: {:#010b}", byte);
         // println!("instruction num: {:#010b}", num);
 
         #[allow(unreachable_patterns)]
-        match byte {
-            ADD => { Add(num) }
-            SUB => { Sub(num) }
+        match op_code {
+            ADD => { Add(group2) }
+            SUB => { Sub(group2) }
             DUMP => { Dump }
+            PUSH => { Push(((group1 as u16) | ((group2 as u16) << 8))) }
+            POP => { Pop }
             _ => { Unknown }
         }
     }
@@ -47,6 +58,14 @@ impl Instruction {
             }
             Unknown => { 0x00 }
             Dump => { DUMP as u32 }
+            Push(number) => {
+                let inst: u32 = (PUSH as u32 | ((*number as u32) << 8));
+                inst
+            }
+            Pop => {
+                let inst: u32 = (POP as u32);
+                inst
+            }
         }
     }
 }

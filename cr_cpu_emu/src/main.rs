@@ -1,6 +1,5 @@
-use crate::constants::{ADD, DRAM_SIZE, DUMP, EMPTY_DRAM, EMPTY_REGISTER, SUB};
 use crate::cpu::Cpu;
-use crate::instruction::Instruction::{Add, Dump, Sub};
+use crate::instruction::Instruction::{Add, Dump, Pop, Push, Sub};
 
 mod constants;
 mod instruction;
@@ -13,6 +12,14 @@ fn main() {
     cpu.add_to_end(Dump.to_instruction_data());
     cpu.add_to_end(Sub(127).to_instruction_data());
     cpu.add_to_end(Dump.to_instruction_data());
+    cpu.add_to_end(Push(511).to_instruction_data());
+    cpu.add_to_end(Push(257).to_instruction_data());
+    cpu.add_to_end(Dump.to_instruction_data());
+    cpu.add_to_end(Pop.to_instruction_data());
+    cpu.add_to_end(Dump.to_instruction_data());
+    cpu.add_to_end(Pop.to_instruction_data());
+    cpu.add_to_end(Dump.to_instruction_data());
+
 
     cpu.execute_until_unknown();
 
