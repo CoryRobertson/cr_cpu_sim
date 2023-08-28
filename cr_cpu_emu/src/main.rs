@@ -43,13 +43,18 @@ enum Instruction {
     Unknown,
 }
 
+fn mask_bit_group(input: u32, group: u8) -> u8 {
+    assert!((0..=3).contains(&(group as i32)));
+    ((input & 0xFF << (group * 8)) >> group * 8) as u8
+}
+
 impl Instruction {
 
     fn decode(instruction_data: u32) -> Self {
 
-        let byte = (instruction_data & 0xFF) as u8;
+        let byte = mask_bit_group(instruction_data,0);
 
-        let num = ((instruction_data & 0xFF0000) >> 16) as u8;
+        let num = mask_bit_group(instruction_data,2);
 
         // println!("instruction data: {:#034b}", instruction_data);
         // println!("instruction byte: {:#010b}", byte);
