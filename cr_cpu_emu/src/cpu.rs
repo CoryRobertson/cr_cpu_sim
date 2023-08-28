@@ -1,12 +1,12 @@
 use crate::constants::{DRAM_SIZE, EMPTY_DRAM, EMPTY_REGISTER};
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{Add, Sub, Unknown, Dump};
+use crate::instruction::Instruction::{Add, Dump, Sub, Unknown};
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct Cpu {
     /// Accumulator
-    acc: u32,
+    pub acc: u32,
     /// Program Counter
     /// represents the index in dram that will be read as an instruction
     pc: u32,
@@ -22,7 +22,7 @@ pub struct Cpu {
     /// Index where the stack currently is at
     sp: u32,
     /// Ram
-    dram: [u32 ; DRAM_SIZE as usize],
+    dram: [u32; DRAM_SIZE as usize],
 
     zero_flag: bool,
     // TODO: stack memory ? heap memory?
@@ -37,7 +37,7 @@ impl Cpu {
             pc: EMPTY_REGISTER,
             ir: EMPTY_REGISTER,
             or: EMPTY_REGISTER,
-            sp: DRAM_SIZE - (DRAM_SIZE/4),
+            sp: DRAM_SIZE - (DRAM_SIZE / 4),
             dram: EMPTY_DRAM,
             zero_flag: false,
         }
@@ -48,7 +48,7 @@ impl Cpu {
     }
 
     pub fn add_to_end(&mut self, inst: u32) {
-        for (index,inst_dram) in self.dram.iter().enumerate() {
+        for (index, inst_dram) in self.dram.iter().enumerate() {
             if Instruction::decode(*inst_dram) == Unknown {
                 self.add_instruction(inst, index as u32);
                 break;
@@ -67,11 +67,9 @@ impl Cpu {
         Instruction::decode(self.ir)
     }
 
-
     /// Execute the instruction in the instruction register
     fn execute(&mut self, inst: Instruction) {
-
-        println!("Instruction executed: [{}]: {:?}",self.pc - 1,inst);
+        println!("Instruction executed: [{}]: {:?}", self.pc - 1, inst);
         println!();
         match inst {
             Add(number) => {
@@ -113,7 +111,9 @@ impl Cpu {
     pub fn execute_until_unknown(&mut self) {
         loop {
             let inst = self.fetch();
-            if matches!(inst, Instruction::Unknown) { break; }
+            if matches!(inst, Instruction::Unknown) {
+                break;
+            }
             self.execute(inst);
         }
     }
@@ -126,7 +126,7 @@ impl Cpu {
         println!("sp: {0:#034b} : {0:#X} : {0}", self.sp);
         println!("or: {0:#034b} : {0:#X} : {0}", self.or);
         println!("Zero flag: {}", self.zero_flag);
-        for (index,data) in self.dram.iter().enumerate() {
+        for (index, data) in self.dram.iter().enumerate() {
             if *data != 0 {
                 println!("[{index}] = {:#034b}", data);
             }
