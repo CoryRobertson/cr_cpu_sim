@@ -1,6 +1,7 @@
 use crate::constants::{DRAM_SIZE, EMPTY_DRAM, EMPTY_REGISTER};
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{Add, Dump, Sub, Unknown};
+use crate::instruction::Instruction::{IAdd, Dump, ISub, Unknown};
+use crate::prelude::IPush;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -16,12 +17,12 @@ pub struct Cpu {
     /// last 24 bits depend on the specific instruction as of now
     ir: u32,
     /// Output register
-    /// Operations that output to a value while replacing the output go here
+    /// Operations that output to a value
     or: u32,
     /// Stack pointer
-    /// Index where the stack currently is at
+    /// Index where the stack currently is at in dram
     sp: u32,
-    /// Ram
+    /// Ram, also used as stack memory
     dram: [u32; DRAM_SIZE as usize],
 
     zero_flag: bool,
@@ -43,15 +44,29 @@ impl Cpu {
         }
     }
 
-    pub fn add_instruction(&mut self, inst: u32, location: u32) {
+    fn add_instruction(&mut self, inst: u32, location: u32) {
         *self.dram.get_mut(location as usize).unwrap() = inst;
     }
 
-    pub fn add_to_end(&mut self, inst: u32) {
-        for (index, inst_dram) in self.dram.iter().enumerate() {
-            if Instruction::decode(*inst_dram) == Unknown {
-                self.add_instruction(inst, index as u32);
-                break;
+    pub fn add_to_end(&mut self, inst: Instruction) {
+        for (index, inst_dram) in self.dram.clone().iter().enumerate() {
+            if *inst_dram == 0x0 { // if the instruction read is 0x0 allow the program to put that instruction into this memory address
+                let inst_list = inst.to_instruction_data();
+                // boolean value which checks if the input instruction fits into the space of memory found, if it does not, keep searching
+                let instruction_fits = !self
+                    .dram
+                    .iter()
+                    .enumerate()
+                    .skip(index) // skip to the index we are currently at in dram, so we dont check any areas which are not needed
+                    .take_while(|(check_index, _)| check_index < &(index + inst_list.len())) // end the iterator at the location that is where our index is + the instruction length
+                    .any(|(_, item)| *item != 0x00); // return true if any of those items are not 0x00
+
+                if instruction_fits { // if the instruction fits, place that instruction in memory, and all of its components
+                    for (add_index, ins) in inst_list.iter().enumerate() {
+                        self.add_instruction(*ins, (index + add_index) as u32);
+                    }
+                    break;
+                }
             }
         }
     }
@@ -67,16 +82,23 @@ impl Cpu {
         Instruction::decode(self.ir)
     }
 
+    /// Fetches the next address in dram as a u32, useful for instructions that span multiple memory address locations
+    fn fetch_value(&mut self) -> u32 {
+        self.ir = *self.dram.get(self.pc as usize).unwrap();
+        self.pc += 1;
+        self.ir
+    }
+
     /// Execute the instruction in the instruction register
     fn execute(&mut self, inst: Instruction) {
         println!("Instruction executed: [{}]: {:?}", self.pc - 1, inst);
         println!();
         match inst {
-            Add(number) => {
+            IAdd(number) => {
                 self.acc += number as u32;
                 self.zero_flag = self.acc == 0;
             }
-            Sub(number) => {
+            ISub(number) => {
                 self.acc -= number as u32;
                 self.zero_flag = self.acc == 0;
             }
@@ -87,7 +109,7 @@ impl Cpu {
             Dump => {
                 self.dump();
             }
-            Instruction::Push(number) => {
+            IPush(number) => {
                 *self.dram.get_mut(self.sp as usize).unwrap() = number as u32;
                 self.zero_flag = number == 0;
                 self.sp += 1;

@@ -1,4 +1,4 @@
 [workspace]
-members = ["cr_cpu_emu","cr_cpu_assembler"]
+members = ["cr_cpu_emu","cr_cpu_assembler","cr_cpu_common"]
 
 resolver = "2"

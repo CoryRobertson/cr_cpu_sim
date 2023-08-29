@@ -1,19 +1,21 @@
 use crate::constants::{ADD, DUMP, POP, PUSH, SUB};
-use crate::instruction::Instruction::{Add, Dump, Pop, Push, Sub, Unknown};
+use crate::instruction::Instruction::{IAdd, Dump, Pop, IPush, ISub, Unknown};
 use crate::mask_bit_group;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
     /// |location unused|number|location unused|opcode|
     /// add = |00000000|11111111|00000000|11111111|
-    Add(u8),
+    IAdd(u8),
     /// |location unused|number|location unused|opcode|
     /// sub = |00000000|11111111|00000000|11111111|
-    Sub(u8),
-    Push(u16),
+    ISub(u8),
+    IPush(u16),
+    /// Pops the current stack pointer address into the output register
     Pop,
     Dump,
     Unknown,
+    // TODO: create a ipushl instruction standing for immediate push long, that allows for an input that is 32 bits, meaning the instruction spans multiple lines
 }
 
 impl Instruction {
@@ -25,44 +27,40 @@ impl Instruction {
         let group2 = mask_bit_group(instruction_data, 2);
         let group3 = mask_bit_group(instruction_data, 3);
 
-        // println!("instruction data: {:#034b}", instruction_data);
-        // println!("instruction byte: {:#010b}", byte);
-        // println!("instruction num: {:#010b}", num);
-
         #[allow(unreachable_patterns)]
         match op_code {
-            ADD => Add(group2),
-            SUB => Sub(group2),
+            ADD => IAdd(group2),
+            SUB => ISub(group2),
             DUMP => Dump,
-            PUSH => Push((group1 as u16) | ((group2 as u16) << 8)),
+            PUSH => IPush((group1 as u16) | ((group2 as u16) << 8)),
             POP => Pop,
             _ => Unknown,
         }
     }
 
-    pub fn to_instruction_data(&self) -> u32 {
+    pub fn to_instruction_data(&self) -> Vec<u32> {
         match self {
-            Add(number) => {
+            IAdd(number) => {
                 // |location unused|number|location unused|opcode|
                 // add = |00000000|11111111|00000000|11111111|
                 let inst: u32 = ADD as u32 | (*number as u32) << 16;
-                inst
+                vec![inst]
             }
-            Sub(number) => {
+            ISub(number) => {
                 // |location unused|number|location unused|opcode|
                 // sub = |00000000|11111111|00000000|11111111|
                 let inst: u32 = SUB as u32 | (*number as u32) << 16;
-                inst
+                vec![inst]
             }
-            Unknown => 0x00,
-            Dump => DUMP as u32,
-            Push(number) => {
+            Unknown => vec![0x00],
+            Dump => vec![DUMP as u32],
+            IPush(number) => {
                 let inst: u32 = PUSH as u32 | ((*number as u32) << 8);
-                inst
+                vec![inst]
             }
             Pop => {
                 let inst: u32 = POP as u32;
-                inst
+                vec![inst]
             }
         }
     }
