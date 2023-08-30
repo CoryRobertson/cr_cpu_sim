@@ -24,6 +24,7 @@ pub enum Instruction {
 impl Instruction {
     #[allow(unused_variables)]
     pub fn decode(instruction_data: u32) -> Self {
+        // TODO: move decoding into the cpu entirely, this allows us to read instruction groups such as IAddL better since we can modify cpu state.
         let op_code = mask_bit_group(instruction_data, 0);
 
         let group1 = mask_bit_group(instruction_data, 1);
