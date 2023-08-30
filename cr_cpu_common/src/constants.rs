@@ -2,7 +2,10 @@
 
 /// Add instruction
 /// | unused | | number to add | | location to add to (unused at the moment) | | op-code |
-pub const ADD: u8 = 0x0A;
+pub const IADD: u8 = 0x0A;
+
+pub const IADDL: u8 = 0x1A;
+
 /// Subtract instruction
 /// Uses same bit format as `ADD` at the moment
 pub const SUB: u8 = 0x0B;

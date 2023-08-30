@@ -1,5 +1,5 @@
-use crate::constants::{ADD, DUMP, POP, PUSH, SUB};
-use crate::instruction::Instruction::{IAdd, Dump, Pop, IPush, ISub, Unknown};
+use crate::constants::{IADD, DUMP, POP, PUSH, SUB, IADDL};
+use crate::instruction::Instruction::{IAdd, Dump, Pop, IPush, ISub, Unknown, IAddL};
 use crate::mask_bit_group;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -7,6 +7,9 @@ pub enum Instruction {
     /// |location unused|number|location unused|opcode|
     /// add = |00000000|11111111|00000000|11111111|
     IAdd(u8),
+
+    IAddL(u32),
+
     /// |location unused|number|location unused|opcode|
     /// sub = |00000000|11111111|00000000|11111111|
     ISub(u8),
@@ -29,11 +32,12 @@ impl Instruction {
 
         #[allow(unreachable_patterns)]
         match op_code {
-            ADD => IAdd(group2),
+            IADD => IAdd(group2),
             SUB => ISub(group2),
             DUMP => Dump,
             PUSH => IPush((group1 as u16) | ((group2 as u16) << 8)),
             POP => Pop,
+            IADDL => IAddL(0),
             _ => Unknown,
         }
     }
@@ -43,7 +47,7 @@ impl Instruction {
             IAdd(number) => {
                 // |location unused|number|location unused|opcode|
                 // add = |00000000|11111111|00000000|11111111|
-                let inst: u32 = ADD as u32 | (*number as u32) << 16;
+                let inst: u32 = IADD as u32 | (*number as u32) << 16;
                 vec![inst]
             }
             ISub(number) => {
@@ -61,6 +65,10 @@ impl Instruction {
             Pop => {
                 let inst: u32 = POP as u32;
                 vec![inst]
+            }
+            IAddL(number) => {
+                let inst: u32 = IADDL as u32;
+                vec![inst,*number]
             }
         }
     }

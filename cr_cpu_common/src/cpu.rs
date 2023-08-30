@@ -22,6 +22,10 @@ pub struct Cpu {
     /// Stack pointer
     /// Index where the stack currently is at in dram
     sp: u32,
+
+    /// Temporary register
+    tr: u32,
+
     /// Ram, also used as stack memory
     dram: [u32; DRAM_SIZE as usize],
 
@@ -39,6 +43,7 @@ impl Cpu {
             ir: EMPTY_REGISTER,
             or: EMPTY_REGISTER,
             sp: DRAM_SIZE - (DRAM_SIZE / 4),
+            tr: EMPTY_REGISTER,
             dram: EMPTY_DRAM,
             zero_flag: false,
         }
@@ -64,6 +69,7 @@ impl Cpu {
                 if instruction_fits { // if the instruction fits, place that instruction in memory, and all of its components
                     for (add_index, ins) in inst_list.iter().enumerate() {
                         self.add_instruction(*ins, (index + add_index) as u32);
+                        println!("{}", inst_list.len());
                     }
                     break;
                 }
@@ -84,9 +90,9 @@ impl Cpu {
 
     /// Fetches the next address in dram as a u32, useful for instructions that span multiple memory address locations
     fn fetch_value(&mut self) -> u32 {
-        self.ir = *self.dram.get(self.pc as usize).unwrap();
+        self.tr = *self.dram.get(self.pc as usize).unwrap();
         self.pc += 1;
-        self.ir
+        self.tr
     }
 
     /// Execute the instruction in the instruction register
@@ -120,6 +126,11 @@ impl Cpu {
                 *self.dram.get_mut(self.sp as usize).unwrap() = 0;
                 self.zero_flag = self.or == 0;
             }
+            Instruction::IAddL(_) => {
+                self.tr = self.fetch_value();
+                self.acc += self.tr;
+                self.zero_flag = self.acc == 0;
+            }
         }
     }
 
@@ -150,7 +161,7 @@ impl Cpu {
         println!("Zero flag: {}", self.zero_flag);
         for (index, data) in self.dram.iter().enumerate() {
             if *data != 0 {
-                println!("[{index}] = {:#034b}", data);
+                println!("[{index}] = {:#034b} : {0} : {0:#X}", data);
             }
         }
         println!();
