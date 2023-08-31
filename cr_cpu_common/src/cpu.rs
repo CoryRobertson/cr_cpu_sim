@@ -1,13 +1,15 @@
-use crate::constants::{DRAM_SIZE, EMPTY_DRAM, EMPTY_REGISTER};
+use std::cmp::Ordering;
+use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{IAdd, Dump, ISub, Unknown};
-use crate::prelude::IPush;
+use crate::instruction::Instruction::{Add, Cmp, Dump, IAdd, IAddL, ISub, JE, JGT, JLT, JZ, MoveR, Unknown};
+use crate::mask_bit_group;
+use crate::prelude::{IPush, Pop};
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct Cpu {
     /// Accumulator
-    pub acc: u32,
+    acc: u32,
     /// Program Counter
     /// represents the index in dram that will be read as an instruction
     pc: u32,
@@ -19,6 +21,11 @@ pub struct Cpu {
     /// Output register
     /// Operations that output to a value
     or: u32,
+
+    /// Input Registers 1 and 2, represent register identifiers (see constants.rs in common) used in instructions
+    inpr1: u8,
+    inpr2: u8,
+
     /// Stack pointer
     /// Index where the stack currently is at in dram
     sp: u32,
@@ -30,6 +37,9 @@ pub struct Cpu {
     dram: [u32; DRAM_SIZE as usize],
 
     zero_flag: bool,
+    lt_flag: bool,
+    gt_flag: bool,
+    eq_flag: bool,
     // TODO: stack memory ? heap memory?
     // TODO: flags?
 }
@@ -42,10 +52,15 @@ impl Cpu {
             pc: EMPTY_REGISTER,
             ir: EMPTY_REGISTER,
             or: EMPTY_REGISTER,
+            inpr1: EMPTY_INPUT_REGISTER,
+            inpr2: EMPTY_INPUT_REGISTER,
             sp: DRAM_SIZE - (DRAM_SIZE / 4),
             tr: EMPTY_REGISTER,
             dram: EMPTY_DRAM,
             zero_flag: false,
+            lt_flag: false,
+            gt_flag: false,
+            eq_flag: false,
         }
     }
 
@@ -55,7 +70,8 @@ impl Cpu {
 
     pub fn add_to_end(&mut self, inst: Instruction) {
         for (index, inst_dram) in self.dram.clone().iter().enumerate() {
-            if *inst_dram == 0x0 { // if the instruction read is 0x0 allow the program to put that instruction into this memory address
+            if *inst_dram == 0x0 {
+                // if the instruction read is 0x0 allow the program to put that instruction into this memory address
                 let inst_list = inst.to_instruction_data();
                 // boolean value which checks if the input instruction fits into the space of memory found, if it does not, keep searching
                 let instruction_fits = !self
@@ -66,10 +82,10 @@ impl Cpu {
                     .take_while(|(check_index, _)| check_index < &(index + inst_list.len())) // end the iterator at the location that is where our index is + the instruction length
                     .any(|(_, item)| *item != 0x00); // return true if any of those items are not 0x00
 
-                if instruction_fits { // if the instruction fits, place that instruction in memory, and all of its components
+                if instruction_fits {
+                    // if the instruction fits, place that instruction in memory, and all of its components
                     for (add_index, ins) in inst_list.iter().enumerate() {
                         self.add_instruction(*ins, (index + add_index) as u32);
-                        println!("{}", inst_list.len());
                     }
                     break;
                 }
@@ -83,16 +99,82 @@ impl Cpu {
         // println!("pc: {}", self.pc);
         self.ir = *self.dram.get(self.pc as usize).unwrap();
         self.pc += 1;
-        // println!("ir: {:#034b}", self.ir);
-        // println!("pc: {:#034b}", self.pc);
-        Instruction::decode(self.ir)
+        self.decode()
     }
 
     /// Fetches the next address in dram as a u32, useful for instructions that span multiple memory address locations
-    fn fetch_value(&mut self) -> u32 {
+    /// stores output in temporary register
+    fn fetch_value_tr(&mut self) {
         self.tr = *self.dram.get(self.pc as usize).unwrap();
         self.pc += 1;
-        self.tr
+    }
+
+    /// Fetches the next address in dram as u32 without decoding, storing it in the instruction register
+    fn fetch_value_ir(&mut self) {
+        self.ir = *self.dram.get(self.pc as usize).unwrap();
+        self.pc += 1;
+    }
+
+    fn decode(&mut self) -> Instruction {
+        let op_code = mask_bit_group(self.ir, 0);
+
+        let group1 = mask_bit_group(self.ir, 1);
+        let group2 = mask_bit_group(self.ir, 2);
+        #[allow(unused_variables)]
+        let group3 = mask_bit_group(self.ir, 3);
+
+        match op_code {
+            IADD => {
+                self.tr = group2 as u32;
+                IAdd(group2)
+            }
+            ADD => {
+                self.inpr1 = group1;
+                self.inpr2 = group2;
+                Add(group1, group2)
+            }
+            SUB => {
+                self.tr = group2 as u32;
+                ISub(group2)
+            }
+            DUMP => Dump,
+            PUSH => {
+                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
+                IPush((group1 as u16) | ((group2 as u16) << 8))
+            }
+            POP => Pop,
+            IADDL => {
+                self.fetch_value_tr();
+                IAddL(self.tr)
+            }
+            MOVER => {
+                self.inpr1 = group1;
+                self.inpr2 = group2;
+                MoveR(group1, group2)
+            }
+            CMP => {
+                self.inpr1 = group1;
+                self.inpr2 = group2;
+                Cmp(group1,group2)
+            }
+            crate::constants::JE => {
+                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
+                JE(self.tr as u16)
+            }
+            crate::constants::JGT => {
+                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
+                JGT(self.tr as u16)
+            }
+            crate::constants::JLT => {
+                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
+                JLT(self.tr as u16)
+            }
+            crate::constants::JZ => {
+                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
+                JZ(self.tr as u16)
+            }
+            _ => Unknown,
+        }
     }
 
     /// Execute the instruction in the instruction register
@@ -100,12 +182,13 @@ impl Cpu {
         println!("Instruction executed: [{}]: {:?}", self.pc - 1, inst);
         println!();
         match inst {
-            IAdd(number) => {
-                self.acc += number as u32;
+            // we dont use any values passed from the instruction itself to better make use of the cpu registers
+            IAdd(_) => {
+                self.acc += self.tr;
                 self.zero_flag = self.acc == 0;
             }
-            ISub(number) => {
-                self.acc -= number as u32;
+            ISub(_) => {
+                self.acc -= self.tr;
                 self.zero_flag = self.acc == 0;
             }
             Unknown => {
@@ -115,24 +198,103 @@ impl Cpu {
             Dump => {
                 self.dump();
             }
-            IPush(number) => {
-                *self.dram.get_mut(self.sp as usize).unwrap() = number as u32;
-                self.zero_flag = number == 0;
+            IPush(_) => {
+                *self.dram.get_mut(self.sp as usize).unwrap() = self.tr;
+                self.zero_flag = self.tr == 0;
                 self.sp += 1;
             }
-            Instruction::Pop => {
+            Pop => {
                 self.sp -= 1;
                 self.or = *self.dram.get(self.sp as usize).unwrap();
                 *self.dram.get_mut(self.sp as usize).unwrap() = 0;
                 self.zero_flag = self.or == 0;
             }
-            Instruction::IAddL(_) => {
-                self.tr = self.fetch_value();
+            IAddL(_) => {
                 self.acc += self.tr;
                 self.zero_flag = self.acc == 0;
             }
+            Add(_, _) => {
+                *self.get_reg(self.inpr1) += *self.get_reg(self.inpr2);
+                self.zero_flag = *self.get_reg(self.inpr1) == 0;
+            }
+            MoveR(_, _) => {
+                *self.get_reg(self.inpr1) = *self.get_reg(self.inpr2);
+                self.zero_flag = *self.get_reg(self.inpr1) == 0;
+            }
+            Cmp(_, _) => {
+                match (self.get_reg(self.inpr1).clone()).cmp(&self.get_reg(self.inpr2)) {
+                    Ordering::Less => {
+                        self.lt_flag = true;
+                        self.eq_flag = false;
+                        self.gt_flag = false;
+                    }
+                    Ordering::Equal => {
+                        self.lt_flag = false;
+                        self.eq_flag = true;
+                        self.gt_flag = false;
+                    }
+                    Ordering::Greater => {
+                        self.lt_flag = false;
+                        self.eq_flag = false;
+                        self.gt_flag = true;
+                    }
+                }
+            }
+            JE(_) => {
+                if self.eq_flag {
+                    self.pc = self.tr;
+                }
+            }
+            JGT(_) => {
+                if self.gt_flag {
+                    self.pc = self.tr;
+                }
+            }
+            JLT(_) => {
+                if self.lt_flag {
+                    self.pc = self.tr;
+                }
+            }
+            JZ(_) => {
+                if self.zero_flag {
+                    self.pc = self.tr;
+                }
+            }
         }
     }
+
+    fn get_reg(&mut self, reg: u8) -> &mut u32 {
+        match reg {
+            ACC => &mut self.acc,
+            PC => &mut self.pc,
+            IR => &mut self.ir,
+            OR => &mut self.or,
+            SP => &mut self.sp,
+            TR => &mut self.tr,
+            _ => {
+                self.dump();
+                panic!("unexpected register input: {}", reg);
+            }
+        }
+    }
+
+    // fn get_flag(&mut self, flag: u8) -> &mut bool {
+    //     match flag {
+    //         crate::constants::JE => {
+    //             &mut self.eq_flag
+    //         }
+    //         crate::constants::JGT => {
+    //             &mut self.gt_flag
+    //         }
+    //         crate::constants::JLT => {
+    //             &mut self.lt_flag
+    //         }
+    //         _ => {
+    //             self.dump();
+    //             panic!("unexpected flag input: {}", flag);
+    //         }
+    //     }
+    // }
 
     pub fn execute_cycles(&mut self, cycle_count: usize) {
         for _ in 0..cycle_count {
@@ -154,11 +316,18 @@ impl Cpu {
     fn dump(&self) {
         println!("CPU Dump:");
         println!("acc: {0:#034b} : {0:#X} : {0}", self.acc);
-        println!("ir: {0:#034b} : {0:#X} : {0}", self.ir);
         println!("pc: {0:#034b} : {0:#X} : {0}", self.pc);
-        println!("sp: {0:#034b} : {0:#X} : {0}", self.sp);
+        println!("ir: {0:#034b} : {0:#X} : {0}", self.ir);
         println!("or: {0:#034b} : {0:#X} : {0}", self.or);
+        println!("inpr1: {0:#034b} : {0:#X} : {0}", self.inpr1);
+        println!("inpr2: {0:#034b} : {0:#X} : {0}", self.inpr2);
+        println!("sp: {0:#034b} : {0:#X} : {0}", self.sp);
+        println!("tr: {0:#034b} : {0:#X} : {0}", self.tr);
         println!("Zero flag: {}", self.zero_flag);
+        println!("LT flag: {}", self.lt_flag);
+        println!("GT flag: {}", self.gt_flag);
+        println!("EQ flag: {}", self.eq_flag);
+
         for (index, data) in self.dram.iter().enumerate() {
             if *data != 0 {
                 println!("[{index}] = {:#034b} : {0} : {0:#X}", data);

@@ -1,15 +1,27 @@
-use crate::constants::{IADD, DUMP, POP, PUSH, SUB, IADDL};
-use crate::instruction::Instruction::{IAdd, Dump, Pop, IPush, ISub, Unknown, IAddL};
-use crate::mask_bit_group;
+use crate::constants::{ADD, CMP, DUMP, IADD, IADDL, MOVER, POP, PUSH, SUB};
+use crate::instruction::Instruction::{Dump, IAdd, IAddL, IPush, ISub, JE, Pop, Unknown};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
+    /// Move register 1 into register 0, does not zero register 1 in the process, simply a copy
+    MoveR(u8, u8),
+
+    /// Compare register 0 and register 1, changing flags when necessary
+    Cmp(u8,u8),
+
+    /// Jump instructions, sets pc to the value given
+    JE(u16),
+    JGT(u16),
+    JLT(u16),
+    JZ(u16),
+
     /// |location unused|number|location unused|opcode|
     /// add = |00000000|11111111|00000000|11111111|
     IAdd(u8),
-
+    /// Add register 1 into register 0
+    Add(u8, u8),
+    /// Add a long number, uses a modified add opcode that specifies that the number to be added is in the proceeding memory location
     IAddL(u32),
-
     /// |location unused|number|location unused|opcode|
     /// sub = |00000000|11111111|00000000|11111111|
     ISub(u8),
@@ -18,31 +30,9 @@ pub enum Instruction {
     Pop,
     Dump,
     Unknown,
-    // TODO: create a ipushl instruction standing for immediate push long, that allows for an input that is 32 bits, meaning the instruction spans multiple lines
 }
 
 impl Instruction {
-    #[allow(unused_variables)]
-    pub fn decode(instruction_data: u32) -> Self {
-        // TODO: move decoding into the cpu entirely, this allows us to read instruction groups such as IAddL better since we can modify cpu state.
-        let op_code = mask_bit_group(instruction_data, 0);
-
-        let group1 = mask_bit_group(instruction_data, 1);
-        let group2 = mask_bit_group(instruction_data, 2);
-        let group3 = mask_bit_group(instruction_data, 3);
-
-        #[allow(unreachable_patterns)]
-        match op_code {
-            IADD => IAdd(group2),
-            SUB => ISub(group2),
-            DUMP => Dump,
-            PUSH => IPush((group1 as u16) | ((group2 as u16) << 8)),
-            POP => Pop,
-            IADDL => IAddL(0),
-            _ => Unknown,
-        }
-    }
-
     pub fn to_instruction_data(&self) -> Vec<u32> {
         match self {
             IAdd(number) => {
@@ -69,7 +59,36 @@ impl Instruction {
             }
             IAddL(number) => {
                 let inst: u32 = IADDL as u32;
-                vec![inst,*number]
+                // IADDL opcode with the input number on the second memory address
+                vec![inst, *number]
+            }
+            Instruction::Add(reg0, reg1) => {
+                let inst: u32 = ADD as u32 | (*reg0 as u32) << 8 | (*reg1 as u32) << 16;
+                vec![inst]
+            }
+            Instruction::MoveR(reg0, reg1) => {
+                let inst: u32 = MOVER as u32 | (*reg0 as u32) << 8 | (*reg1 as u32) << 16;
+                vec![inst]
+            }
+            Instruction::Cmp(reg0, reg1) => {
+                let inst: u32 = CMP as u32 | (*reg0 as u32) << 8 | (*reg1 as u32) << 16;
+                vec![inst]
+            }
+            JE(pc) => {
+                let inst: u32 = crate::constants::JE as u32 | ((*pc as u32) << 8);
+                vec![inst]
+            }
+            Instruction::JGT(pc) => {
+                let inst: u32 = crate::constants::JGT as u32 | ((*pc as u32) << 8);
+                vec![inst]
+            }
+            Instruction::JLT(pc) => {
+                let inst: u32 = crate::constants::JLT as u32 | ((*pc as u32) << 8);
+                vec![inst]
+            }
+            Instruction::JZ(pc) => {
+                let inst: u32 = crate::constants::JZ as u32 | ((*pc as u32) << 8);
+                vec![inst]
             }
         }
     }
