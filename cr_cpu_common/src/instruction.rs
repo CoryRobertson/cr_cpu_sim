@@ -1,5 +1,5 @@
-use crate::constants::{ADD, CMP, DUMP, IADD, IADDL, MOVER, POP, PUSH, SUB};
-use crate::instruction::Instruction::{Dump, IAdd, IAddL, IPush, ISub, JE, Pop, Unknown};
+use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, MOVER, POP, PUSH, SUB};
+use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, IPush, ISub, Pop, Unknown, JE};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
@@ -7,7 +7,7 @@ pub enum Instruction {
     MoveR(u8, u8),
 
     /// Compare register 0 and register 1, changing flags when necessary
-    Cmp(u8,u8),
+    Cmp(u8, u8),
 
     /// Jump instructions, sets pc to the value given
     JE(u16),
@@ -91,5 +91,25 @@ impl Instruction {
                 vec![inst]
             }
         }
+    }
+
+    pub fn from_code_line(line: &Vec<String>) -> Option<Self> {
+        let uncap_line = line.get(0).unwrap().to_lowercase();
+        if uncap_line.eq("add") {
+            if line.len() == 2 {
+                return Some(IAdd(line.get(1)?.parse().ok()?));
+            }
+            if line.len() == 3 {
+                let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                let reg1id: u8 = get_id_from_reg_name(line.get(2)?)?;
+
+                return Some(Add(reg0id, reg1id));
+            }
+        }
+        if uncap_line.eq("dump") && line.len() == 1 {
+            return Some(Dump);
+        }
+
+        None
     }
 }

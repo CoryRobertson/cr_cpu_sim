@@ -3,12 +3,12 @@ pub mod cpu;
 pub mod instruction;
 
 pub mod prelude {
+    pub use crate::constants::{ACC, OR};
     pub use crate::cpu::Cpu;
     pub use crate::cpu_make;
+    pub use crate::instruction::Instruction::{Cmp, JGT, JLT};
     pub use crate::instruction::Instruction::{Dump, IAdd, IPush, ISub, Pop};
     pub use crate::interpret;
-    pub use crate::constants::{ACC, OR};
-    pub use crate::instruction::Instruction::{Cmp, JGT, JLT};
 }
 
 pub fn mask_bit_group(input: u32, group: u8) -> u8 {

@@ -5,7 +5,7 @@ fn main() {
     cpu.add_to_end(IAdd(192));
     cpu.add_to_end(ISub(64));
     cpu.add_to_end(Dump);
-    cpu.add_to_end(Cmp(ACC,OR));
+    cpu.add_to_end(Cmp(ACC, OR));
     cpu.add_to_end(JGT(1));
     cpu.add_to_end(Dump);
 

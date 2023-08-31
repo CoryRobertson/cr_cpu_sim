@@ -45,6 +45,18 @@ pub const OR: u8 = 0x3A;
 pub const SP: u8 = 0x4A;
 pub const TR: u8 = 0x5A;
 
+pub fn get_id_from_reg_name(name: &str) -> Option<u8> {
+    match name.to_uppercase().as_str() {
+        "ACC" => Some(ACC),
+        "PC" => Some(PC),
+        "IR" => Some(IR),
+        "OR" => Some(OR),
+        "SP" => Some(SP),
+        "TR" => Some(TR),
+        _ => None,
+    }
+}
+
 pub const ZERO_FLAG: u8 = 0x1F;
 pub const GREATER_FLAG: u8 = 0x2F;
 pub const LESS_FLAG: u8 = 0x3F;

@@ -1,9 +1,14 @@
-use std::cmp::Ordering;
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{Add, Cmp, Dump, IAdd, IAddL, ISub, JE, JGT, JLT, JZ, MoveR, Unknown};
+use crate::instruction::Instruction::{
+    Add, Cmp, Dump, IAdd, IAddL, ISub, MoveR, Unknown, JE, JGT, JLT, JZ,
+};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
+use std::cmp::Ordering;
+use std::fs::File;
+use std::io::Read;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -62,6 +67,47 @@ impl Cpu {
             gt_flag: false,
             eq_flag: false,
         }
+    }
+
+    pub fn get_dram(&self) -> &[u32] {
+        &self.dram
+    }
+
+    pub fn from_binary(path: PathBuf) -> Self {
+        let mut cpu = Self::new();
+        let mut file = File::open(&path).unwrap();
+        let mut buf = vec![];
+        file.read_to_end(&mut buf).unwrap();
+        let mut iter = buf.iter();
+        let mut i = 0;
+        loop {
+            if let Some(op_code) = iter.next() {
+                if let Some(g1) = iter.next() {
+                    if let Some(g2) = iter.next() {
+                        if let Some(g3) = iter.next() {
+                            let inst: u32 = *op_code as u32
+                                | (*g1 as u32) << 8
+                                | (*g2 as u32) << 16
+                                | (*g3 as u32) << 24;
+
+                            cpu.add_instruction(inst, i);
+
+                            i += 1;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        cpu
     }
 
     fn add_instruction(&mut self, inst: u32, location: u32) {
@@ -155,7 +201,7 @@ impl Cpu {
             CMP => {
                 self.inpr1 = group1;
                 self.inpr2 = group2;
-                Cmp(group1,group2)
+                Cmp(group1, group2)
             }
             crate::constants::JE => {
                 self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
@@ -179,8 +225,8 @@ impl Cpu {
 
     /// Execute the instruction in the instruction register
     fn execute(&mut self, inst: Instruction) {
-        println!("Instruction executed: [{}]: {:?}", self.pc - 1, inst);
-        println!();
+        #[cfg(debug_assertions)]
+        println!("Instruction executed: [{}]: {:?}\n", self.pc - 1, inst);
         match inst {
             // we dont use any values passed from the instruction itself to better make use of the cpu registers
             IAdd(_) => {
@@ -221,25 +267,23 @@ impl Cpu {
                 *self.get_reg(self.inpr1) = *self.get_reg(self.inpr2);
                 self.zero_flag = *self.get_reg(self.inpr1) == 0;
             }
-            Cmp(_, _) => {
-                match (self.get_reg(self.inpr1).clone()).cmp(&self.get_reg(self.inpr2)) {
-                    Ordering::Less => {
-                        self.lt_flag = true;
-                        self.eq_flag = false;
-                        self.gt_flag = false;
-                    }
-                    Ordering::Equal => {
-                        self.lt_flag = false;
-                        self.eq_flag = true;
-                        self.gt_flag = false;
-                    }
-                    Ordering::Greater => {
-                        self.lt_flag = false;
-                        self.eq_flag = false;
-                        self.gt_flag = true;
-                    }
+            Cmp(_, _) => match (self.get_reg(self.inpr1).clone()).cmp(&self.get_reg(self.inpr2)) {
+                Ordering::Less => {
+                    self.lt_flag = true;
+                    self.eq_flag = false;
+                    self.gt_flag = false;
                 }
-            }
+                Ordering::Equal => {
+                    self.lt_flag = false;
+                    self.eq_flag = true;
+                    self.gt_flag = false;
+                }
+                Ordering::Greater => {
+                    self.lt_flag = false;
+                    self.eq_flag = false;
+                    self.gt_flag = true;
+                }
+            },
             JE(_) => {
                 if self.eq_flag {
                     self.pc = self.tr;
