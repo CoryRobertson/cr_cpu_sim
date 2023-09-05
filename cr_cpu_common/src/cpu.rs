@@ -1,8 +1,6 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{
-    Add, Cmp, Dump, IAdd, IAddL, IMoveL, ISub, MoveR, Sub, Unknown, JE, JGT, JLT, JZ,
-};
+use crate::instruction::Instruction::{Add, Cmp, Dump, IAdd, IAddL, IMoveL, ISub, MoveR, Sub, Unknown, JE, JGT, JLT, JOV, JZ, JMP};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
@@ -15,6 +13,9 @@ use std::path::PathBuf;
 pub struct Cpu {
     /// Accumulator
     acc: u32,
+
+    // TODO: add a register used to hold numbers for counting purposes such as a for loop, ecx?
+
     /// Program Counter
     /// represents the index in dram that will be read as an instruction
     pc: u32,
@@ -45,6 +46,7 @@ pub struct Cpu {
     lt_flag: bool,
     gt_flag: bool,
     eq_flag: bool,
+    ov_flag: bool,
     // TODO: stack memory ? heap memory?
     // TODO: flags?
 }
@@ -66,6 +68,7 @@ impl Cpu {
             lt_flag: false,
             gt_flag: false,
             eq_flag: false,
+            ov_flag: false,
         }
     }
 
@@ -114,7 +117,7 @@ impl Cpu {
         *self.dram.get_mut(location as usize).unwrap() = inst;
     }
 
-    pub fn add_to_end(&mut self, inst: Instruction) {
+    pub fn add_to_end(&mut self, inst: &Instruction) {
         for (index, inst_dram) in self.dram.clone().iter().enumerate() {
             if *inst_dram == 0x0 {
                 // if the instruction read is 0x0 allow the program to put that instruction into this memory address
@@ -177,6 +180,8 @@ impl Cpu {
             crate::constants::JGT => JGT(0),
             crate::constants::JLT => JLT(0),
             crate::constants::JZ => JZ(0),
+            crate::constants::JOV => JOV(0),
+            crate::constants::JMP => JMP(0),
             SUB => Sub(0, 0),
             _ => Unknown,
         }
@@ -213,6 +218,14 @@ impl Cpu {
                 self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
                 JZ(self.tr as u16)
             }
+            JOV(_) => {
+                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
+                JOV(self.tr as u16)
+            }
+            JMP(_) => {
+                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
+                JMP(self.tr as u16)
+            }
             IAdd(_) => {
                 self.tr = group2 as u32;
                 IAdd(group2)
@@ -234,6 +247,7 @@ impl Cpu {
             Pop => Pop,
             Dump => Dump,
             Unknown => Unknown,
+
         }
     }
 
@@ -263,12 +277,16 @@ impl Cpu {
 
         match inst {
             // we dont use any values passed from the instruction itself to better make use of the cpu registers
-            IAdd(_) => {
-                self.acc += self.tr;
+            IAdd(_) | IAddL(_) => {
+                let (outcome, chk) = self.acc.overflowing_add(self.tr);
+                self.acc = outcome;
+                self.ov_flag = chk;
                 self.zero_flag = self.acc == 0;
             }
             ISub(_) => {
-                self.acc -= self.tr;
+                let (outcome, chk) = self.acc.overflowing_sub(self.tr);
+                self.acc = outcome;
+                self.ov_flag = chk;
                 self.zero_flag = self.acc == 0;
             }
             Unknown => {
@@ -297,13 +315,11 @@ impl Cpu {
                 *self.dram.get_mut(self.sp as usize).unwrap() = 0;
                 self.zero_flag = self.or == 0;
             }
-            IAddL(_) => {
-                self.acc += self.tr;
-                self.zero_flag = self.acc == 0;
-            }
             Add(_, _) => {
-                *self.get_reg(mask_bit_group(self.ir, 1)) +=
-                    *self.get_reg(mask_bit_group(self.ir, 2));
+                let (outcome, chk) = (*self.get_reg(mask_bit_group(self.ir, 1)))
+                    .overflowing_add(*self.get_reg(mask_bit_group(self.ir, 2)));
+                self.ov_flag = chk;
+                *self.get_reg(mask_bit_group(self.ir, 1)) = outcome;
                 self.print_inpr_regs();
                 self.zero_flag = *self.get_reg(mask_bit_group(self.ir, 1)) == 0;
             }
@@ -361,10 +377,20 @@ impl Cpu {
                 self.zero_flag = *self.get_reg(mask_bit_group(self.ir, 1)) == 0;
             }
             Sub(_, _) => {
-                *self.get_reg(mask_bit_group(self.ir, 1)) -=
-                    *self.get_reg(mask_bit_group(self.ir, 2));
+                let (outcome, chk) = (*self.get_reg(mask_bit_group(self.ir, 1)))
+                    .overflowing_sub(*self.get_reg(mask_bit_group(self.ir, 2)));
+                *self.get_reg(mask_bit_group(self.ir, 1)) = outcome;
+                self.ov_flag = chk;
                 self.zero_flag = *self.get_reg(mask_bit_group(self.ir, 1)) == 0;
                 self.print_inpr_regs();
+            }
+            JOV(_) => {
+                if self.ov_flag {
+                    self.pc = self.tr;
+                }
+            }
+            JMP(_) => {
+                self.pc = self.tr;
             }
         }
         println!();
@@ -436,6 +462,7 @@ impl Cpu {
         println!("LT flag: {}", self.lt_flag);
         println!("GT flag: {}", self.gt_flag);
         println!("EQ flag: {}", self.eq_flag);
+        println!("OV flag: {}", self.ov_flag);
 
         for (index, data) in self.dram.iter().enumerate() {
             let inst_text = {
@@ -451,7 +478,7 @@ impl Cpu {
                     IAddL(_) => {
                         format!("{}", self.dram.get(index + 1).unwrap())
                     }
-                    JE(_) | JGT(_) | JLT(_) | JZ(_) => {
+                    JE(_) | JGT(_) | JLT(_) | JZ(_) | JOV(_) | JMP(_) => {
                         format!("{}", mask_bit_group(*data, 1))
                     }
                     ISub(_) | IAdd(_) | IPush(_) => {
@@ -464,8 +491,8 @@ impl Cpu {
                     Sub(_, _) | Add(_, _) | Cmp(_, _) | MoveR(_, _) => {
                         format!(
                             "{} {}",
-                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
-                            get_name_from_reg_id(mask_bit_group(*data, 2)).unwrap()
+                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap_or("Unknown".to_string()),
+                            get_name_from_reg_id(mask_bit_group(*data, 2)).unwrap_or("Unknown".to_string())
                         )
                     }
                     Pop | Dump | Unknown => "".to_string(),

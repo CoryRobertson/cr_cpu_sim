@@ -42,30 +42,40 @@ impl ProgramFile {
     }
     fn compile(&mut self) {
         self.cpu = Cpu::new();
+        let mut instructions = vec![];
+
+        let added_lines = |list: &Vec<Instruction>| -> u32 {
+            list.iter().map(|inst| inst.to_instruction_data().len() as u32)
+                .filter(|len| *len != 1)
+                .map(|len| len - 1)
+                .sum()
+        };
+
         for (line_index, line) in self
             .lines
             .iter()
             .enumerate()
-            .filter(|(_, line)| !line.is_empty() && !line.contains(';'))
+            .filter(|(_, line)| !line.is_empty() && !line.trim().starts_with(';'))
             .map(|(index, line)| {
                 (
                     index,
-                    line.split(' ')
+                    line.split_whitespace()
                         .map(|item| item.to_string())
                         .collect::<Vec<String>>(),
                 )
             })
         {
-            let inst_opt = Instruction::from_code_line(&line);
+            let inst_opt = Instruction::from_code_line(&line,added_lines(&instructions));
             if let Some(inst) = inst_opt {
                 let hex_text = inst
                     .to_instruction_data()
                     .iter()
                     .fold("".to_string(), |a, b| format!("{a} {b:#X}"));
                 println!("{0:?} : {1}", inst, hex_text);
-                self.cpu.add_to_end(inst);
+                self.cpu.add_to_end(&inst);
+                instructions.push(inst);
             } else {
-                panic!("Unexpected line {}: {:?}", line_index + 1, line);
+                panic!("Unexpected item in line {}: {:?}", line_index + 1, line);
             }
         }
 

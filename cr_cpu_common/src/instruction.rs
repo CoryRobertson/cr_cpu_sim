@@ -1,11 +1,10 @@
 use crate::constants::{
     get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, IMOVEL, ISUB, MOVER, POP, PUSH, SUB,
 };
-use crate::instruction::Instruction::{
-    Add, Dump, IAdd, IAddL, IMoveL, IPush, ISub, MoveR, Pop, Sub, Unknown, JE,
-};
+use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, IMoveL, IPush, ISub, MoveR, Pop, Sub, Unknown, JE, JOV, JZ, JMP};
+use crate::prelude::{Cmp, JGT, JLT};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
     /// Move register 1 into register 0, does not zero register 1 in the process, simply a copy
     MoveR(u8, u8),
@@ -17,9 +16,11 @@ pub enum Instruction {
 
     /// Jump instructions, sets pc to the value given
     JE(u16),
+    JMP(u16),
     JGT(u16),
     JLT(u16),
     JZ(u16),
+    JOV(u16),
 
     /// |location unused|number|location unused|opcode|
     /// add = |00000000|11111111|00000000|11111111|
@@ -69,11 +70,11 @@ impl Instruction {
                 // IADDL opcode with the input number on the second memory address
                 vec![inst, *number]
             }
-            Instruction::Add(reg0, reg1) => {
+            Add(reg0, reg1) => {
                 let inst: u32 = ADD as u32 | (*reg0 as u32) << 8 | (*reg1 as u32) << 16;
                 vec![inst]
             }
-            Instruction::MoveR(reg0, reg1) => {
+            MoveR(reg0, reg1) => {
                 let inst: u32 = MOVER as u32 | (*reg0 as u32) << 8 | (*reg1 as u32) << 16;
                 vec![inst]
             }
@@ -106,46 +107,105 @@ impl Instruction {
                 let inst: u32 = SUB as u32 | (*reg0 as u32) << 8 | (*reg1 as u32) << 16;
                 vec![inst]
             }
+            JOV(pc) => {
+                let inst: u32 = crate::constants::JOV as u32 | ((*pc as u32) << 8);
+                vec![inst]
+            }
+            JMP(pc) => {
+                let inst: u32 = crate::constants::JMP as u32 | ((*pc as u32) << 8);
+                vec![inst]
+            }
         }
     }
 
-    pub fn from_code_line(line: &Vec<String>) -> Option<Self> {
+    pub fn from_code_line(line: &Vec<String>, added_lines: u32) -> Option<Self> {
         let uncap_line = line.get(0).unwrap().to_lowercase();
-        if uncap_line.eq("add") {
-            if line.len() == 2 {
-                return Some(IAdd(line.get(1)?.parse().ok()?));
-            }
-            if line.len() == 3 {
-                let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
-                let reg1id: u8 = get_id_from_reg_name(line.get(2)?)?;
+        match uncap_line.as_str() {
+            "add" => {
+                // add immediate
+                if line.len() == 2 {
+                    return Some(IAdd(line.get(1)?.parse().ok()?));
+                }
+                // add r
+                if line.len() == 3 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    let reg1id: u8 = get_id_from_reg_name(line.get(2)?)?;
 
-                return Some(Add(reg0id, reg1id));
+                    return Some(Add(reg0id, reg1id));
+                }
             }
-        }
-        if uncap_line.eq("dump") && line.len() == 1 {
-            return Some(Dump);
-        }
-        if uncap_line.eq("move") && line.len() == 3 {
-            let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
-            let reg1id = get_id_from_reg_name(line.get(2)?)?;
-            return Some(MoveR(reg0id, reg1id));
-        }
-        if uncap_line.eq("imove") && line.len() == 3 {
-            let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
-            return Some(IMoveL(reg0id, line.get(2)?.parse().ok()?));
-        }
-        if uncap_line.eq("sub") {
-            if line.len() == 3 {
-                let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
-                let reg1id: u8 = get_id_from_reg_name(line.get(2)?)?;
+            "dump" => {
+                if line.len() == 1 {
+                    return Some(Dump);
+                }
+            }
+            "move" => {
+                if line.len() == 3 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    let reg1id = get_id_from_reg_name(line.get(2)?)?;
+                    return Some(MoveR(reg0id, reg1id));
+                }
+            }
+            "imovel" => {
+                // immediate move long
+                if line.len() == 3 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    return Some(IMoveL(reg0id, line.get(2)?.parse().ok()?));
+                }
+            }
+            "sub" => {
+                // sub reg
+                if line.len() == 3 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    let reg1id: u8 = get_id_from_reg_name(line.get(2)?)?;
 
-                return Some(Sub(reg0id, reg1id));
+                    return Some(Sub(reg0id, reg1id));
+                }
+                // immediate sub
+                if line.len() == 2 {
+                    return Some(ISub(line.get(1)?.parse().ok()?));
+                }
             }
-            if line.len() == 2 {
-                return Some(ISub(line.get(1)?.parse().ok()?));
+            "jov" => {
+                if line.len() == 2 {
+                    return Some(JOV((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                }
             }
+            "jz" => {
+                if line.len() == 2 {
+                    return Some(JZ((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                }
+            }
+            "jgt" => {
+                if line.len() == 2 {
+                    return Some(JGT((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                }
+            }
+            "jlt" => {
+                if line.len() == 2 {
+                    return Some(JLT((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                }
+            }
+            "je" => {
+                if line.len() == 2 {
+                    return Some(JE((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                }
+            }
+            "jmp" => {
+                if line.len() == 2 {
+                    return Some(JMP((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                }
+            }
+            "cmp" => {
+                if line.len() == 3 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    let reg1id: u8 = get_id_from_reg_name(line.get(2)?)?;
+
+                    return Some(Cmp(reg0id, reg1id));
+                }
+            }
+            _ => {}
         }
-        // isub
         // ipush
         // ipop
         // jz

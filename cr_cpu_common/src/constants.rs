@@ -12,6 +12,8 @@ pub const JE: u8 = 0x03;
 pub const JGT: u8 = 0x04;
 pub const JLT: u8 = 0x05;
 pub const JZ: u8 = 0x06;
+pub const JOV: u8 = 0x07;
+pub const JMP: u8 = 0x08;
 
 /// Add instruction opcodes
 /// | unused | | number to add | | location to add to (unused at the moment) | | op-code |
@@ -47,6 +49,7 @@ pub const OR: u8 = 0x3A;
 pub const SP: u8 = 0x4A;
 pub const TR: u8 = 0x5A;
 
+
 pub fn get_id_from_reg_name(name: &str) -> Option<u8> {
     match name.to_uppercase().as_str() {
         "ACC" => Some(ACC),
@@ -79,3 +82,4 @@ pub const ZERO_FLAG: u8 = 0x1F;
 pub const GREATER_FLAG: u8 = 0x2F;
 pub const LESS_FLAG: u8 = 0x3F;
 pub const EQUAL_FLAG: u8 = 0x4F;
+pub const OV: u8 = 0x5F;
