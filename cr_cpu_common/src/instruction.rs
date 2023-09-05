@@ -1,10 +1,16 @@
-use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, MOVER, POP, PUSH, SUB};
-use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, IPush, ISub, Pop, Unknown, JE};
+use crate::constants::{
+    get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, IMOVEL, ISUB, MOVER, POP, PUSH, SUB,
+};
+use crate::instruction::Instruction::{
+    Add, Dump, IAdd, IAddL, IMoveL, IPush, ISub, MoveR, Pop, Sub, Unknown, JE,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
     /// Move register 1 into register 0, does not zero register 1 in the process, simply a copy
     MoveR(u8, u8),
+    /// move item 1 into register in item 0
+    IMoveL(u8, u32),
 
     /// Compare register 0 and register 1, changing flags when necessary
     Cmp(u8, u8),
@@ -25,6 +31,7 @@ pub enum Instruction {
     /// |location unused|number|location unused|opcode|
     /// sub = |00000000|11111111|00000000|11111111|
     ISub(u8),
+    Sub(u8, u8),
     IPush(u16),
     /// Pops the current stack pointer address into the output register
     Pop,
@@ -44,7 +51,7 @@ impl Instruction {
             ISub(number) => {
                 // |location unused|number|location unused|opcode|
                 // sub = |00000000|11111111|00000000|11111111|
-                let inst: u32 = SUB as u32 | (*number as u32) << 16;
+                let inst: u32 = ISUB as u32 | (*number as u32) << 16;
                 vec![inst]
             }
             Unknown => vec![0x00],
@@ -90,6 +97,15 @@ impl Instruction {
                 let inst: u32 = crate::constants::JZ as u32 | ((*pc as u32) << 8);
                 vec![inst]
             }
+            IMoveL(register, number) => {
+                let inst: u32 = IMOVEL as u32 | (*register as u32) << 8;
+                // IMoveL opcode with register identifier with the input number on the second memory address
+                vec![inst, *number]
+            }
+            Sub(reg0, reg1) => {
+                let inst: u32 = SUB as u32 | (*reg0 as u32) << 8 | (*reg1 as u32) << 16;
+                vec![inst]
+            }
         }
     }
 
@@ -109,6 +125,34 @@ impl Instruction {
         if uncap_line.eq("dump") && line.len() == 1 {
             return Some(Dump);
         }
+        if uncap_line.eq("move") && line.len() == 3 {
+            let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+            let reg1id = get_id_from_reg_name(line.get(2)?)?;
+            return Some(MoveR(reg0id, reg1id));
+        }
+        if uncap_line.eq("imove") && line.len() == 3 {
+            let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+            return Some(IMoveL(reg0id, line.get(2)?.parse().ok()?));
+        }
+        if uncap_line.eq("sub") {
+            if line.len() == 3 {
+                let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                let reg1id: u8 = get_id_from_reg_name(line.get(2)?)?;
+
+                return Some(Sub(reg0id, reg1id));
+            }
+            if line.len() == 2 {
+                return Some(ISub(line.get(1)?.parse().ok()?));
+            }
+        }
+        // isub
+        // ipush
+        // ipop
+        // jz
+        // jlt
+        // jgt
+        // je
+        // cmp
 
         None
     }

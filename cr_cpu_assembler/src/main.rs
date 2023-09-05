@@ -13,6 +13,7 @@ fn main() {
     } else {
         pf.compile();
         pf.output_binary();
+        pf.run_binary();
     }
 }
 
@@ -67,6 +68,8 @@ impl ProgramFile {
                 panic!("Unexpected line {}: {:?}", line_index + 1, line);
             }
         }
+
+        println!();
     }
     fn run(&mut self) {
         self.cpu.execute_until_unknown();

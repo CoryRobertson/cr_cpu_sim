@@ -1,7 +1,7 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
 use crate::instruction::Instruction::{
-    Add, Cmp, Dump, IAdd, IAddL, ISub, MoveR, Unknown, JE, JGT, JLT, JZ,
+    Add, Cmp, Dump, IAdd, IAddL, IMoveL, ISub, MoveR, Sub, Unknown, JE, JGT, JLT, JZ,
 };
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
@@ -28,8 +28,8 @@ pub struct Cpu {
     or: u32,
 
     /// Input Registers 1 and 2, represent register identifiers (see constants.rs in common) used in instructions
-    inpr1: u8,
-    inpr2: u8,
+    // inpr1: u8,
+    // inpr2: u8,
 
     /// Stack pointer
     /// Index where the stack currently is at in dram
@@ -57,8 +57,8 @@ impl Cpu {
             pc: EMPTY_REGISTER,
             ir: EMPTY_REGISTER,
             or: EMPTY_REGISTER,
-            inpr1: EMPTY_INPUT_REGISTER,
-            inpr2: EMPTY_INPUT_REGISTER,
+            // inpr1: EMPTY_INPUT_REGISTER,
+            // inpr2: EMPTY_INPUT_REGISTER,
             sp: DRAM_SIZE - (DRAM_SIZE / 4),
             tr: EMPTY_REGISTER,
             dram: EMPTY_DRAM,
@@ -161,6 +161,27 @@ impl Cpu {
         self.pc += 1;
     }
 
+    fn decode_inst(inst: u8) -> Instruction {
+        match inst {
+            IADD => IAdd(0),
+            ADD => Add(0, 0),
+            ISUB => ISub(0),
+            DUMP => Dump,
+            PUSH => IPush(0),
+            POP => Pop,
+            IADDL => IAddL(0),
+            MOVER => MoveR(0, 0),
+            IMOVEL => IMoveL(0, 0),
+            CMP => Cmp(0, 0),
+            crate::constants::JE => JE(0),
+            crate::constants::JGT => JGT(0),
+            crate::constants::JLT => JLT(0),
+            crate::constants::JZ => JZ(0),
+            SUB => Sub(0, 0),
+            _ => Unknown,
+        }
+    }
+
     fn decode(&mut self) -> Instruction {
         let op_code = mask_bit_group(self.ir, 0);
 
@@ -169,64 +190,77 @@ impl Cpu {
         #[allow(unused_variables)]
         let group3 = mask_bit_group(self.ir, 3);
 
-        match op_code {
-            IADD => {
-                self.tr = group2 as u32;
-                IAdd(group2)
-            }
-            ADD => {
-                self.inpr1 = group1;
-                self.inpr2 = group2;
-                Add(group1, group2)
-            }
-            SUB => {
-                self.tr = group2 as u32;
-                ISub(group2)
-            }
-            DUMP => Dump,
-            PUSH => {
-                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
-                IPush((group1 as u16) | ((group2 as u16) << 8))
-            }
-            POP => Pop,
-            IADDL => {
+        match Cpu::decode_inst(op_code) {
+            MoveR(_, _) => MoveR(group1, group2),
+            IMoveL(_, _) => {
                 self.fetch_value_tr();
-                IAddL(self.tr)
+                IMoveL(group1, self.tr)
             }
-            MOVER => {
-                self.inpr1 = group1;
-                self.inpr2 = group2;
-                MoveR(group1, group2)
-            }
-            CMP => {
-                self.inpr1 = group1;
-                self.inpr2 = group2;
-                Cmp(group1, group2)
-            }
-            crate::constants::JE => {
+            Cmp(_, _) => Cmp(group1, group2),
+            JE(_) => {
                 self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
                 JE(self.tr as u16)
             }
-            crate::constants::JGT => {
+            JGT(_) => {
                 self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
                 JGT(self.tr as u16)
             }
-            crate::constants::JLT => {
+            JLT(_) => {
                 self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
                 JLT(self.tr as u16)
             }
-            crate::constants::JZ => {
+            JZ(_) => {
                 self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
                 JZ(self.tr as u16)
             }
-            _ => Unknown,
+            IAdd(_) => {
+                self.tr = group2 as u32;
+                IAdd(group2)
+            }
+            Add(_, _) => Add(group1, group2),
+            IAddL(_) => {
+                self.fetch_value_tr();
+                IAddL(self.tr)
+            }
+            ISub(_) => {
+                self.tr = group2 as u32;
+                ISub(group2)
+            }
+            Sub(_, _) => Sub(group1, group2),
+            IPush(_) => {
+                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
+                IPush((group1 as u16) | ((group2 as u16) << 8))
+            }
+            Pop => Pop,
+            Dump => Dump,
+            Unknown => Unknown,
         }
+    }
+
+    fn print_inpr_regs(&self) -> Option<()> {
+        let inpr1 = mask_bit_group(self.ir, 1);
+        let inpr2 = mask_bit_group(self.ir, 2);
+        let reg0 = get_name_from_reg_id(inpr1)?;
+        let reg1 = get_name_from_reg_id(inpr2)?;
+        println!("{inpr1}: {reg0}, {inpr2}: {reg1}");
+        Some(())
+    }
+
+    fn print_inpr_reg(&self) -> Option<()> {
+        let inpr1 = mask_bit_group(self.ir, 1);
+        let reg0 = get_name_from_reg_id(inpr1)?;
+        println!("{inpr1}: {reg0}");
+        Some(())
     }
 
     /// Execute the instruction in the instruction register
     fn execute(&mut self, inst: Instruction) {
         #[cfg(debug_assertions)]
-        println!("Instruction executed: [{}]: {:?}\n", self.pc - 1, inst);
+        {
+            let len = inst.to_instruction_data().len() as u32;
+            println!("Instruction executed: [{}]: {:?}", self.pc - len, inst);
+        }
+
         match inst {
             // we dont use any values passed from the instruction itself to better make use of the cpu registers
             IAdd(_) => {
@@ -238,8 +272,16 @@ impl Cpu {
                 self.zero_flag = self.acc == 0;
             }
             Unknown => {
-                println!("Unknown instruction");
-                dbg!(&self);
+                let inst = self.fetch();
+                if matches!(inst, Instruction::Unknown) {
+                    println!(
+                        "Reached end of program by finding two unknown instructions, pc: {}",
+                        self.pc
+                    );
+                } else {
+                    println!("Unknown instruction");
+                    dbg!(&self);
+                }
             }
             Dump => {
                 self.dump();
@@ -260,30 +302,39 @@ impl Cpu {
                 self.zero_flag = self.acc == 0;
             }
             Add(_, _) => {
-                *self.get_reg(self.inpr1) += *self.get_reg(self.inpr2);
-                self.zero_flag = *self.get_reg(self.inpr1) == 0;
+                *self.get_reg(mask_bit_group(self.ir, 1)) +=
+                    *self.get_reg(mask_bit_group(self.ir, 2));
+                self.print_inpr_regs();
+                self.zero_flag = *self.get_reg(mask_bit_group(self.ir, 1)) == 0;
             }
             MoveR(_, _) => {
-                *self.get_reg(self.inpr1) = *self.get_reg(self.inpr2);
-                self.zero_flag = *self.get_reg(self.inpr1) == 0;
+                *self.get_reg(mask_bit_group(self.ir, 1)) =
+                    *self.get_reg(mask_bit_group(self.ir, 2));
+                self.print_inpr_regs();
+                self.zero_flag = *self.get_reg(mask_bit_group(self.ir, 1)) == 0;
             }
-            Cmp(_, _) => match (self.get_reg(self.inpr1).clone()).cmp(&self.get_reg(self.inpr2)) {
-                Ordering::Less => {
-                    self.lt_flag = true;
-                    self.eq_flag = false;
-                    self.gt_flag = false;
+            Cmp(_, _) => {
+                self.print_inpr_regs();
+                match (self.get_reg(mask_bit_group(self.ir, 1)).clone())
+                    .cmp(&self.get_reg(mask_bit_group(self.ir, 2)))
+                {
+                    Ordering::Less => {
+                        self.lt_flag = true;
+                        self.eq_flag = false;
+                        self.gt_flag = false;
+                    }
+                    Ordering::Equal => {
+                        self.lt_flag = false;
+                        self.eq_flag = true;
+                        self.gt_flag = false;
+                    }
+                    Ordering::Greater => {
+                        self.lt_flag = false;
+                        self.eq_flag = false;
+                        self.gt_flag = true;
+                    }
                 }
-                Ordering::Equal => {
-                    self.lt_flag = false;
-                    self.eq_flag = true;
-                    self.gt_flag = false;
-                }
-                Ordering::Greater => {
-                    self.lt_flag = false;
-                    self.eq_flag = false;
-                    self.gt_flag = true;
-                }
-            },
+            }
             JE(_) => {
                 if self.eq_flag {
                     self.pc = self.tr;
@@ -304,7 +355,19 @@ impl Cpu {
                     self.pc = self.tr;
                 }
             }
+            IMoveL(_, _) => {
+                self.print_inpr_reg();
+                *self.get_reg(mask_bit_group(self.ir, 1)) = self.tr;
+                self.zero_flag = *self.get_reg(mask_bit_group(self.ir, 1)) == 0;
+            }
+            Sub(_, _) => {
+                *self.get_reg(mask_bit_group(self.ir, 1)) -=
+                    *self.get_reg(mask_bit_group(self.ir, 2));
+                self.zero_flag = *self.get_reg(mask_bit_group(self.ir, 1)) == 0;
+                self.print_inpr_regs();
+            }
         }
+        println!();
     }
 
     fn get_reg(&mut self, reg: u8) -> &mut u32 {
@@ -350,10 +413,11 @@ impl Cpu {
     pub fn execute_until_unknown(&mut self) {
         loop {
             let inst = self.fetch();
-            if matches!(inst, Instruction::Unknown) {
+            let cont = matches!(inst, Instruction::Unknown);
+            self.execute(inst);
+            if cont {
                 break;
             }
-            self.execute(inst);
         }
     }
 
@@ -363,8 +427,9 @@ impl Cpu {
         println!("pc: {0:#034b} : {0:#X} : {0}", self.pc);
         println!("ir: {0:#034b} : {0:#X} : {0}", self.ir);
         println!("or: {0:#034b} : {0:#X} : {0}", self.or);
-        println!("inpr1: {0:#034b} : {0:#X} : {0}", self.inpr1);
-        println!("inpr2: {0:#034b} : {0:#X} : {0}", self.inpr2);
+        // println!("inpr1: {0:#034b} : {0:#X} : {0}", self.inpr1);
+        // println!("inpr2: {0:#034b} : {0:#X} : {0}", self.inpr2);
+
         println!("sp: {0:#034b} : {0:#X} : {0}", self.sp);
         println!("tr: {0:#034b} : {0:#X} : {0}", self.tr);
         println!("Zero flag: {}", self.zero_flag);
@@ -373,8 +438,45 @@ impl Cpu {
         println!("EQ flag: {}", self.eq_flag);
 
         for (index, data) in self.dram.iter().enumerate() {
+            let inst_text = {
+                let inst_enum = Cpu::decode_inst(mask_bit_group(*data, 0));
+                let args_text = match inst_enum {
+                    IMoveL(_, _) => {
+                        format!(
+                            "{} {}",
+                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
+                            self.dram.get(index + 1).unwrap()
+                        )
+                    }
+                    IAddL(_) => {
+                        format!("{}", self.dram.get(index + 1).unwrap())
+                    }
+                    JE(_) | JGT(_) | JLT(_) | JZ(_) => {
+                        format!("{}", mask_bit_group(*data, 1))
+                    }
+                    ISub(_) | IAdd(_) | IPush(_) => {
+                        format!(
+                            "{}",
+                            (mask_bit_group(*data, 1) as u16)
+                                | ((mask_bit_group(*data, 2) as u16) << 8)
+                        )
+                    }
+                    Sub(_, _) | Add(_, _) | Cmp(_, _) | MoveR(_, _) => {
+                        format!(
+                            "{} {}",
+                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
+                            get_name_from_reg_id(mask_bit_group(*data, 2)).unwrap()
+                        )
+                    }
+                    Pop | Dump | Unknown => "".to_string(),
+                };
+                let inst_fmt =
+                    format!("{:?} {}", inst_enum, args_text).replace(['(', ')', '0', ','], "");
+
+                inst_fmt
+            };
             if *data != 0 {
-                println!("[{index}] = {:#034b} : {0} : {0:#X}", data);
+                println!("[{index}] = {:#034b} : {0} : {0:#X} : {}", data, inst_text);
             }
         }
         println!();
