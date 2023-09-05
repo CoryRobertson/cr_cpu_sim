@@ -169,32 +169,32 @@ impl Instruction {
             "jov" => {
                 if line.len() == 2 {
                     // TODO: added lines here does not seem to work as expected
-                    return Some(JOV((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                    return Some(JOV((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
                 }
             }
             "jz" => {
                 if line.len() == 2 {
-                    return Some(JZ((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                    return Some(JZ((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
                 }
             }
             "jgt" => {
                 if line.len() == 2 {
-                    return Some(JGT((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                    return Some(JGT((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
                 }
             }
             "jlt" => {
                 if line.len() == 2 {
-                    return Some(JLT((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                    return Some(JLT((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
                 }
             }
             "je" => {
                 if line.len() == 2 {
-                    return Some(JE((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                    return Some(JE((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
                 }
             }
             "jmp" => {
                 if line.len() == 2 {
-                    return Some(JMP((added_lines + line.get(1)?.parse::<u32>().ok()?) as u16));
+                    return Some(JMP((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
                 }
             }
             "cmp" => {

@@ -1,7 +1,7 @@
 use cr_cpu_common::instruction::Instruction;
 use cr_cpu_common::prelude::Cpu;
 use std::fs::File;
-use std::io;
+use std::{fs, io};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
@@ -14,6 +14,8 @@ fn main() {
         pf.compile();
         pf.output_binary();
         pf.run_binary();
+        #[cfg(debug_assertions)]
+        fs::remove_file("./code.bin").unwrap();
     }
 }
 
@@ -46,7 +48,7 @@ impl ProgramFile {
 
         let added_lines = |list: &Vec<Instruction>| -> u32 {
             list.iter().map(|inst| inst.to_instruction_data().len() as u32)
-                .filter(|len| *len != 1)
+                .filter(|len| *len > 1)
                 .map(|len| len - 1)
                 .sum()
         };
