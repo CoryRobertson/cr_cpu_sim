@@ -1,7 +1,9 @@
 use crate::constants::{
     get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, IMOVEL, ISUB, MOVER, POP, PUSH, SUB,
 };
-use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, IMoveL, IPush, ISub, MoveR, Pop, Sub, Unknown, JE, JOV, JZ, JMP};
+use crate::instruction::Instruction::{
+    Add, Dump, IAdd, IAddL, IMoveL, IPush, ISub, MoveR, Pop, Sub, Unknown, JE, JMP, JOV, JZ,
+};
 use crate::prelude::{Cmp, JGT, JLT};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -168,33 +170,44 @@ impl Instruction {
             }
             "jov" => {
                 if line.len() == 2 {
-                    // TODO: added lines here does not seem to work as expected
-                    return Some(JOV((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
+                    return Some(JOV(
+                        (line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16
+                    ));
                 }
             }
             "jz" => {
                 if line.len() == 2 {
-                    return Some(JZ((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
+                    return Some(JZ(
+                        (line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16
+                    ));
                 }
             }
             "jgt" => {
                 if line.len() == 2 {
-                    return Some(JGT((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
+                    return Some(JGT(
+                        (line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16
+                    ));
                 }
             }
             "jlt" => {
                 if line.len() == 2 {
-                    return Some(JLT((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
+                    return Some(JLT(
+                        (line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16
+                    ));
                 }
             }
             "je" => {
                 if line.len() == 2 {
-                    return Some(JE((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
+                    return Some(JE(
+                        (line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16
+                    ));
                 }
             }
             "jmp" => {
                 if line.len() == 2 {
-                    return Some(JMP((line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16));
+                    return Some(JMP(
+                        (line.get(1)?.parse::<u32>().ok()? + added_lines - 1) as u16
+                    ));
                 }
             }
             "cmp" => {
@@ -216,5 +229,17 @@ impl Instruction {
         // cmp
 
         None
+    }
+
+    pub fn change_jump_line(&mut self, pc: u16) {
+        match self {
+            JMP(line_num) | JE(line_num) | JGT(line_num) | JLT(line_num) | JZ(line_num)
+            | JOV(line_num) => {
+                *line_num = pc;
+            }
+            _ => {
+                panic!("Unexpected jump instruction, this should pretty much never happen");
+            }
+        }
     }
 }

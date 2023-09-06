@@ -1,6 +1,8 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{Add, Cmp, Dump, IAdd, IAddL, IMoveL, ISub, MoveR, Sub, Unknown, JE, JGT, JLT, JOV, JZ, JMP};
+use crate::instruction::Instruction::{
+    Add, Cmp, Dump, IAdd, IAddL, IMoveL, ISub, MoveR, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ,
+};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
@@ -15,7 +17,6 @@ pub struct Cpu {
     acc: u32,
 
     // TODO: add a register used to hold numbers for counting purposes such as a for loop, ecx?
-
     /// Program Counter
     /// represents the index in dram that will be read as an instruction
     pc: u32,
@@ -247,7 +248,6 @@ impl Cpu {
             Pop => Pop,
             Dump => Dump,
             Unknown => Unknown,
-
         }
     }
 
@@ -484,21 +484,27 @@ impl Cpu {
                     ISub(_) | IAdd(_) | IPush(_) => {
                         format!(
                             "{}",
-                            (mask_bit_group(*data, 1) as u16)
-                                | ((mask_bit_group(*data, 2) as u16) << 8)
+                            (mask_bit_group(*data, 2) as u16) // | ((mask_bit_group(*data, 2) as u16) << 8)
                         )
                     }
                     Sub(_, _) | Add(_, _) | Cmp(_, _) | MoveR(_, _) => {
                         format!(
                             "{} {}",
-                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap_or("Unknown".to_string()),
-                            get_name_from_reg_id(mask_bit_group(*data, 2)).unwrap_or("Unknown".to_string())
+                            get_name_from_reg_id(mask_bit_group(*data, 1))
+                                .unwrap_or("Unknown".to_string()),
+                            get_name_from_reg_id(mask_bit_group(*data, 2))
+                                .unwrap_or("Unknown".to_string())
                         )
                     }
                     Pop | Dump | Unknown => "".to_string(),
                 };
-                let inst_fmt =
-                    format!("{:?} {}", inst_enum, args_text).replace(['(', ')', '0', ','], "");
+
+                let inst_fmt = format!(
+                    "{} {}",
+                    { format!("{inst_enum:?}").replace('0', "") },
+                    args_text
+                )
+                .replace(['(', ')', ','], "");
 
                 inst_fmt
             };
