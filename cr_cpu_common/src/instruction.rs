@@ -1,9 +1,5 @@
-use crate::constants::{
-    get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, IMOVEL, ISUB, MOVER, POP, PUSH, SUB,
-};
-use crate::instruction::Instruction::{
-    Add, Dump, IAdd, IAddL, IMoveL, IPush, ISub, MoveR, Pop, Sub, Unknown, JE, JMP, JOV, JZ,
-};
+use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, IMOVEL, ISUB, MOVER, POP, PUSH, SUB, ICMP, ICMPL};
+use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, IMoveL, IPush, ISub, MoveR, Pop, Sub, Unknown, JE, JMP, JOV, JZ, ICmp, ICmpL};
 use crate::prelude::{Cmp, JGT, JLT};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -15,6 +11,10 @@ pub enum Instruction {
 
     /// Compare register 0 and register 1, changing flags when necessary
     Cmp(u8, u8),
+    /// Compare register 0 and an immediate mode number
+    ICmp(u8, u16),
+    /// Compare register 0 and an immediate long number
+    ICmpL(u8, u32),
 
     /// Jump instructions, sets pc to the value given
     JE(u16),
@@ -80,7 +80,7 @@ impl Instruction {
                 let inst: u32 = MOVER as u32 | (*reg0 as u32) << 8 | (*reg1 as u32) << 16;
                 vec![inst]
             }
-            Instruction::Cmp(reg0, reg1) => {
+            Cmp(reg0, reg1) => {
                 let inst: u32 = CMP as u32 | (*reg0 as u32) << 8 | (*reg1 as u32) << 16;
                 vec![inst]
             }
@@ -88,15 +88,15 @@ impl Instruction {
                 let inst: u32 = crate::constants::JE as u32 | ((*pc as u32) << 8);
                 vec![inst]
             }
-            Instruction::JGT(pc) => {
+            JGT(pc) => {
                 let inst: u32 = crate::constants::JGT as u32 | ((*pc as u32) << 8);
                 vec![inst]
             }
-            Instruction::JLT(pc) => {
+            JLT(pc) => {
                 let inst: u32 = crate::constants::JLT as u32 | ((*pc as u32) << 8);
                 vec![inst]
             }
-            Instruction::JZ(pc) => {
+            JZ(pc) => {
                 let inst: u32 = crate::constants::JZ as u32 | ((*pc as u32) << 8);
                 vec![inst]
             }
@@ -116,6 +116,14 @@ impl Instruction {
             JMP(pc) => {
                 let inst: u32 = crate::constants::JMP as u32 | ((*pc as u32) << 8);
                 vec![inst]
+            }
+            ICmp(reg0, val) => {
+                let inst: u32 = ICMP as u32 | (*reg0 as u32) << 8 | (*val as u32) << 16;
+                vec![inst]
+            }
+            ICmpL(reg0, val) => {
+                let inst: u32 = ICMPL as u32 | (*reg0 as u32) << 8;
+                vec![inst, *val]
             }
         }
     }
@@ -216,6 +224,22 @@ impl Instruction {
                     let reg1id: u8 = get_id_from_reg_name(line.get(2)?)?;
 
                     return Some(Cmp(reg0id, reg1id));
+                }
+            }
+            "icmp" => {
+                if line.len() == 3 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    let val: u16 = line.get(2)?.parse().ok()?;
+
+                    return Some(ICmp(reg0id,val));
+                }
+            }
+            "icmpl" => {
+                if line.len() == 3 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    let val: u32 = line.get(2)?.parse().ok()?;
+
+                    return Some(ICmpL(reg0id, val));
                 }
             }
             _ => {}

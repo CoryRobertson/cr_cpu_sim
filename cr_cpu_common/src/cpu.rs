@@ -1,8 +1,6 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{
-    Add, Cmp, Dump, IAdd, IAddL, IMoveL, ISub, MoveR, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ,
-};
+use crate::instruction::Instruction::{Add, Cmp, Dump, IAdd, IAddL, IMoveL, ISub, MoveR, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ, ICmp, ICmpL};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
@@ -15,6 +13,8 @@ use std::path::PathBuf;
 pub struct Cpu {
     /// Accumulator
     acc: u32,
+    /// Counting register
+    cr: u32,
 
     // TODO: add a register used to hold numbers for counting purposes such as a for loop, ecx?
     /// Program Counter
@@ -57,6 +57,7 @@ impl Cpu {
     pub fn new() -> Self {
         Cpu {
             acc: EMPTY_REGISTER,
+            cr: EMPTY_REGISTER,
             pc: EMPTY_REGISTER,
             ir: EMPTY_REGISTER,
             or: EMPTY_REGISTER,
@@ -77,6 +78,7 @@ impl Cpu {
         &self.dram
     }
 
+    /// Interpret a binary and create a cpu from it, this binary is not checked for validity
     pub fn from_binary(path: PathBuf) -> Self {
         let mut cpu = Self::new();
         let mut file = File::open(&path).unwrap();
@@ -114,10 +116,13 @@ impl Cpu {
         cpu
     }
 
+    /// Force an instruction into a given location, overwriting what ever is there
     fn add_instruction(&mut self, inst: u32, location: u32) {
         *self.dram.get_mut(location as usize).unwrap() = inst;
     }
 
+    /// Add an instruction to the first available space in dram,
+    /// checking for if the instruction size can fit
     pub fn add_to_end(&mut self, inst: &Instruction) {
         for (index, inst_dram) in self.dram.clone().iter().enumerate() {
             if *inst_dram == 0x0 {
@@ -146,7 +151,6 @@ impl Cpu {
     /// Fetch the instruction from `dram` and increment the `program counter`
     /// Fetch decodes the instruction as well
     fn fetch(&mut self) -> Instruction {
-        // println!("pc: {}", self.pc);
         self.ir = *self.dram.get(self.pc as usize).unwrap();
         self.pc += 1;
         self.decode()
@@ -165,6 +169,9 @@ impl Cpu {
         self.pc += 1;
     }
 
+    /// Decode a single opcode into an instruction,
+    /// the instruction will not have any information filled out,
+    /// it is to be used purely for pattern matching
     fn decode_inst(inst: u8) -> Instruction {
         match inst {
             IADD => IAdd(0),
@@ -184,10 +191,14 @@ impl Cpu {
             crate::constants::JOV => JOV(0),
             crate::constants::JMP => JMP(0),
             SUB => Sub(0, 0),
+            ICMP => ICmp(0,0),
+            ICMPL => ICmpL(0,0),
             _ => Unknown,
         }
     }
 
+    /// Decode the curent opcode in IR into an instruction,
+    /// assigning data where it needs to go when needed
     fn decode(&mut self) -> Instruction {
         let op_code = mask_bit_group(self.ir, 0);
 
@@ -248,9 +259,17 @@ impl Cpu {
             Pop => Pop,
             Dump => Dump,
             Unknown => Unknown,
+            ICmp(_, _) => {
+                ICmp(group1,(group1 as u16) | ((group2 as u16) << 8))
+            }
+            ICmpL(_, _) => {
+                self.fetch_value_tr();
+                ICmpL(group1,self.tr)
+            }
         }
     }
 
+    /// Print the bitmask group 1 and 2 of IR, typically inpr1 and inpr2
     fn print_inpr_regs(&self) -> Option<()> {
         let inpr1 = mask_bit_group(self.ir, 1);
         let inpr2 = mask_bit_group(self.ir, 2);
@@ -260,6 +279,7 @@ impl Cpu {
         Some(())
     }
 
+    /// Print bit mask ground 1 from IR, typically the first inpr
     fn print_inpr_reg(&self) -> Option<()> {
         let inpr1 = mask_bit_group(self.ir, 1);
         let reg0 = get_name_from_reg_id(inpr1)?;
@@ -331,25 +351,9 @@ impl Cpu {
             }
             Cmp(_, _) => {
                 self.print_inpr_regs();
-                match (self.get_reg(mask_bit_group(self.ir, 1)).clone())
-                    .cmp(&self.get_reg(mask_bit_group(self.ir, 2)))
-                {
-                    Ordering::Less => {
-                        self.lt_flag = true;
-                        self.eq_flag = false;
-                        self.gt_flag = false;
-                    }
-                    Ordering::Equal => {
-                        self.lt_flag = false;
-                        self.eq_flag = true;
-                        self.gt_flag = false;
-                    }
-                    Ordering::Greater => {
-                        self.lt_flag = false;
-                        self.eq_flag = false;
-                        self.gt_flag = true;
-                    }
-                }
+                let v1 = self.get_reg(mask_bit_group(self.ir, 1)).clone();
+                let v2 = self.get_reg(mask_bit_group(self.ir, 2)).clone();
+                self.cmp_num(v1,v2);
             }
             JE(_) => {
                 if self.eq_flag {
@@ -392,10 +396,44 @@ impl Cpu {
             JMP(_) => {
                 self.pc = self.tr;
             }
+            ICmp(_, _) => {
+                self.print_inpr_reg();
+                let v1 = self.get_reg(mask_bit_group(self.ir,1)).clone();
+                let v2 = (mask_bit_group(self.ir,2).clone() as u32) | (mask_bit_group(self.ir, 3) as u32) << 16;
+                self.cmp_num(v1,v2);
+            }
+            ICmpL(_, _) => {
+                self.print_inpr_reg();
+                let v1 = self.get_reg(mask_bit_group(self.ir, 1)).clone();
+                self.cmp_num(v1,self.tr);
+            }
         }
         println!();
     }
 
+    /// Compare both input numbers and assign flag states
+    fn cmp_num(&mut self, num1: u32, num2: u32) {
+        match (num1).cmp(&num2)
+        {
+            Ordering::Less => {
+                self.lt_flag = true;
+                self.eq_flag = false;
+                self.gt_flag = false;
+            }
+            Ordering::Equal => {
+                self.lt_flag = false;
+                self.eq_flag = true;
+                self.gt_flag = false;
+            }
+            Ordering::Greater => {
+                self.lt_flag = false;
+                self.eq_flag = false;
+                self.gt_flag = true;
+            }
+        }
+    }
+
+    /// Get a register pointer from a register ID number
     fn get_reg(&mut self, reg: u8) -> &mut u32 {
         match reg {
             ACC => &mut self.acc,
@@ -404,6 +442,7 @@ impl Cpu {
             OR => &mut self.or,
             SP => &mut self.sp,
             TR => &mut self.tr,
+            CR => &mut self.cr,
             _ => {
                 self.dump();
                 panic!("unexpected register input: {}", reg);
@@ -429,6 +468,7 @@ impl Cpu {
     //     }
     // }
 
+    /// Execute a specific number of cycles
     pub fn execute_cycles(&mut self, cycle_count: usize) {
         for _ in 0..cycle_count {
             let inst = self.fetch();
@@ -436,6 +476,7 @@ impl Cpu {
         }
     }
 
+    /// Run the cpu dram until there is an unknown instruction
     pub fn execute_until_unknown(&mut self) {
         loop {
             let inst = self.fetch();
@@ -447,15 +488,20 @@ impl Cpu {
         }
     }
 
+    // fn print_reg(reg_name: &str, reg_val: u32) -> String {
+    //     format!("{reg_name}: {0:#034b} : {0:#X} : {0}", reg_val)
+    // }
+
+    /// Prints a very friendly dump of all necessary values to debug the cpu :)
     fn dump(&self) {
         println!("CPU Dump:");
         println!("acc: {0:#034b} : {0:#X} : {0}", self.acc);
+        println!("cr: {0:#034b} : {0:#X} : {0}", self.cr);
         println!("pc: {0:#034b} : {0:#X} : {0}", self.pc);
         println!("ir: {0:#034b} : {0:#X} : {0}", self.ir);
         println!("or: {0:#034b} : {0:#X} : {0}", self.or);
         // println!("inpr1: {0:#034b} : {0:#X} : {0}", self.inpr1);
         // println!("inpr2: {0:#034b} : {0:#X} : {0}", self.inpr2);
-
         println!("sp: {0:#034b} : {0:#X} : {0}", self.sp);
         println!("tr: {0:#034b} : {0:#X} : {0}", self.tr);
         println!("Zero flag: {}", self.zero_flag);
@@ -468,7 +514,7 @@ impl Cpu {
             let inst_text = {
                 let inst_enum = Cpu::decode_inst(mask_bit_group(*data, 0));
                 let args_text = match inst_enum {
-                    IMoveL(_, _) => {
+                    IMoveL(_, _) | ICmpL(_,_) => {
                         format!(
                             "{} {}",
                             get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
@@ -497,6 +543,7 @@ impl Cpu {
                         )
                     }
                     Pop | Dump | Unknown => "".to_string(),
+                    ICmp(_, _) => { "ICmp".to_string() }
                 };
 
                 let inst_fmt = format!(

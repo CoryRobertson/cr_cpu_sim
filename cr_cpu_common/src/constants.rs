@@ -6,13 +6,23 @@ pub const IMOVEL: u8 = 0x11;
 
 /// Compare register opcode
 pub const CMP: u8 = 0x02;
+/// Immediate mode compare opcode
+pub const ICMP: u8 = 0xA2;
+/// Immediate mode compare long number opcode
+pub const ICMPL: u8 = 0xB2;
 
-/// Jump instruction opcodes
+// Jump instruction opcodes
+/// Jump equal to
 pub const JE: u8 = 0x03;
+/// Jump greater than
 pub const JGT: u8 = 0x04;
+/// Jump less than
 pub const JLT: u8 = 0x05;
+/// Jump zero
 pub const JZ: u8 = 0x06;
+/// Jump overflow
 pub const JOV: u8 = 0x07;
+/// Jump
 pub const JMP: u8 = 0x08;
 
 /// Add instruction opcodes
@@ -20,10 +30,12 @@ pub const JMP: u8 = 0x08;
 pub const IADD: u8 = 0x0A;
 /// Add instruction opcode for adding one register into another
 pub const ADD: u8 = 0x2A;
+/// Immediate mode add long number opcode
 pub const IADDL: u8 = 0x1A;
 
 /// Subtract instruction
 pub const ISUB: u8 = 0x0B;
+/// Subtract opcode
 pub const SUB: u8 = 0x1B;
 
 /// Push instruction opcode
@@ -43,12 +55,15 @@ pub const DRAM_SIZE: u32 = 128;
 
 // Register identifiers
 pub const ACC: u8 = 0x0A;
+pub const CR: u8 = 0x6A;
 pub const PC: u8 = 0x1A;
 pub const IR: u8 = 0x2A;
 pub const OR: u8 = 0x3A;
 pub const SP: u8 = 0x4A;
 pub const TR: u8 = 0x5A;
 
+/// Using a name, get the id of a register if there is one
+/// Used in the compiler to determine what the user intends when they specify a register
 pub fn get_id_from_reg_name(name: &str) -> Option<u8> {
     match name.to_uppercase().as_str() {
         "ACC" => Some(ACC),
@@ -57,10 +72,13 @@ pub fn get_id_from_reg_name(name: &str) -> Option<u8> {
         "OR" => Some(OR),
         "SP" => Some(SP),
         "TR" => Some(TR),
+        "CR" => Some(CR),
         _ => None,
     }
 }
 
+/// Using an id, get a name of a register, used in debugging the cpu
+/// using its dump instruction
 pub fn get_name_from_reg_id(id: u8) -> Option<String> {
     match id {
         ACC => Some("ACC".to_string()),
@@ -69,8 +87,11 @@ pub fn get_name_from_reg_id(id: u8) -> Option<String> {
         OR => Some("OR".to_string()),
         SP => Some("SP".to_string()),
         TR => Some("TR".to_string()),
+        CR => Some("CR".to_string()),
         _ => {
-            dbg!(id);
+            if id != 0 {
+                dbg!(id);
+            }
             None
         }
     }
