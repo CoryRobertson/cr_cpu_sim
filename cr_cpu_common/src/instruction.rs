@@ -131,6 +131,7 @@ impl Instruction {
     pub fn from_code_line(line: &Vec<String>, added_lines: u32) -> Option<Self> {
         let uncap_line = line.get(0).unwrap().to_lowercase();
         match uncap_line.as_str() {
+            // TODO: use https://crates.io/crates/eval eval crate here when parsing numbers so we can allow for expressions
             "add" => {
                 // add immediate
                 if line.len() == 2 {

@@ -22,8 +22,6 @@ fn main() {
     }
 }
 
-// TODO: allow for a line in asm to be for example: add 5+3, where rust parses the 5+3 using a rust function, i believe this is interpret function?
-
 /// Returns true if the given item is a label, requirements being that it starts and ends with ':'
 /// e.g. `:this_is_a_label:`
 fn is_label(item: &str) -> bool {
