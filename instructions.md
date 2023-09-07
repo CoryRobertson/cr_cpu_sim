@@ -46,7 +46,7 @@ dump
 ```
 Dumps all relevant cpu information into the console
 
-#### Move
+### Move
 Immediate mode:
 ```
 imovel acc 400
@@ -59,3 +59,9 @@ move acc or
 ```
 Copies the output register into the acc register
  
+### Jump instructions
+Jump if overflow
+Jump if zero
+Jump if less than
+Jump if greater than
+Jump if equal

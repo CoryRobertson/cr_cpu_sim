@@ -36,6 +36,7 @@ pub enum Instruction {
     ISub(u8),
     Sub(u8, u8),
     IPush(u16),
+    // TODO: ipushl
     /// Pops the current stack pointer address into the output register
     Pop,
     Dump,
@@ -241,6 +242,17 @@ impl Instruction {
                     let val: u32 = line.get(2)?.parse().ok()?;
 
                     return Some(ICmpL(reg0id, val));
+                }
+            }
+            "push" => {
+                if line.len() == 2 {
+                    let val: u32 = line.get(1)?.parse().ok()?;
+                    return Some(IPush(val as u16));
+                }
+            }
+            "pop" => {
+                if line.len() == 1 {
+                    return Some(Pop);
                 }
             }
             _ => {}
