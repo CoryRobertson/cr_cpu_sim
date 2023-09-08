@@ -1,10 +1,11 @@
 ### Registers:
-* ACC
-* PC
-* IR
-* OR
-* SP
-* TR
+* ACC Accumulator
+* CR Counting register
+* PC Program counter
+* IR Instruction register
+* OR Output register
+* SP Stack pointer
+* TR Temporary register
 
 ### Flags:
 * zero flag
