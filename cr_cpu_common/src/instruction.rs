@@ -1,5 +1,11 @@
-use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, IMOVEL, ISUB, MOVER, POP, PUSH, SUB, ICMP, ICMPL};
-use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, IMoveL, IPush, ISub, MoveR, Pop, Sub, Unknown, JE, JMP, JOV, JZ, ICmp, ICmpL};
+use crate::constants::{
+    get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL, ISUB,
+    MOVER, POP, SUB,
+};
+use crate::instruction::Instruction::{
+    Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, MoveR, Pop, Sub, Unknown, JE,
+    JMP, JOV, JZ,
+};
 use crate::prelude::{Cmp, JGT, JLT};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -25,18 +31,19 @@ pub enum Instruction {
     JOV(u16),
 
     /// |location unused|number|location unused|opcode|
-    /// add = |00000000|11111111|00000000|11111111|
     IAdd(u8),
     /// Add register 1 into register 0
     Add(u8, u8),
     /// Add a long number, uses a modified add opcode that specifies that the number to be added is in the proceeding memory location
     IAddL(u32),
     /// |location unused|number|location unused|opcode|
-    /// sub = |00000000|11111111|00000000|11111111|
     ISub(u8),
+    /// Subtract register0 from register1
     Sub(u8, u8),
+    /// Push number to stack
     IPush(u16),
-    // TODO: ipushl
+    /// Push long number to stack
+    IPushL(u32),
     /// Pops the current stack pointer address into the output register
     Pop,
     Dump,
@@ -61,7 +68,7 @@ impl Instruction {
             Unknown => vec![0x00],
             Dump => vec![DUMP as u32],
             IPush(number) => {
-                let inst: u32 = PUSH as u32 | ((*number as u32) << 8);
+                let inst: u32 = IPUSH as u32 | ((*number as u32) << 8);
                 vec![inst]
             }
             Pop => {
@@ -125,6 +132,10 @@ impl Instruction {
             ICmpL(reg0, val) => {
                 let inst: u32 = ICMPL as u32 | (*reg0 as u32) << 8;
                 vec![inst, *val]
+            }
+            IPushL(number) => {
+                let inst: u32 = IPUSHL as u32;
+                vec![inst, *number]
             }
         }
     }
@@ -232,8 +243,7 @@ impl Instruction {
                 if line.len() == 3 {
                     let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
                     let val: u16 = line.get(2)?.parse().ok()?;
-
-                    return Some(ICmp(reg0id,val));
+                    return Some(ICmp(reg0id, val));
                 }
             }
             "icmpl" => {
@@ -248,6 +258,12 @@ impl Instruction {
                 if line.len() == 2 {
                     let val: u32 = line.get(1)?.parse().ok()?;
                     return Some(IPush(val as u16));
+                }
+            }
+            "ipushl" => {
+                if line.len() == 2 {
+                    let val: u32 = line.get(1)?.parse().ok()?;
+                    return Some(IPushL(val));
                 }
             }
             "pop" => {

@@ -14,6 +14,11 @@
 * equal flag
 * overflow flag
 
+### Labels:
+Labels represent a compiletime marker of an instruction number. 
+When a jump command uses a label, the label text is replaced with the 
+line number equivalent at compiletime, which means that it is not
+required to change every jump instruction when a previous line is changed.
 
 ### Add:
 Immediate mode:
@@ -59,10 +64,45 @@ Register mode:
 move acc or
 ```
 Copies the output register into the acc register
+
+### Compare:
+Immediate mode:
+```
+icmp 
+```
+Register mode: 
+```
+
+```
  
 ### Jump instructions
 Jump if overflow
+```
+:supercoollabel:
+; -- snip --
+jov supercoollabel
+```
 Jump if zero
+```
+:supercoollabel:
+; -- snip --
+jz supercoollabel
+```
 Jump if less than
+```
+:supercoollabel:
+; -- snip --
+jlt supercoollabel
+```
 Jump if greater than
+```
+:supercoollabel:
+; -- snip --
+jgt supercoollabel
+```
 Jump if equal
+```
+:supercoollabel:
+; -- snip --
+je supercoollabel
+```

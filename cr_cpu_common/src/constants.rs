@@ -39,7 +39,8 @@ pub const ISUB: u8 = 0x0B;
 pub const SUB: u8 = 0x1B;
 
 /// Push instruction opcode
-pub const PUSH: u8 = 0x0C;
+pub const IPUSH: u8 = 0x0C;
+pub const IPUSHL: u8 = 0x2C;
 
 /// Pop instruction opcode
 pub const POP: u8 = 0x1C;

@@ -1,6 +1,9 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{Add, Cmp, Dump, IAdd, IAddL, IMoveL, ISub, MoveR, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ, ICmp, ICmpL};
+use crate::instruction::Instruction::{
+    Add, Cmp, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, MoveR, Sub, Unknown, JE, JGT,
+    JLT, JMP, JOV, JZ,
+};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
@@ -15,8 +18,6 @@ pub struct Cpu {
     acc: u32,
     /// Counting register
     cr: u32,
-
-    // TODO: add a register used to hold numbers for counting purposes such as a for loop, ecx?
     /// Program Counter
     /// represents the index in dram that will be read as an instruction
     pc: u32,
@@ -178,7 +179,7 @@ impl Cpu {
             ADD => Add(0, 0),
             ISUB => ISub(0),
             DUMP => Dump,
-            PUSH => IPush(0),
+            IPUSH => IPush(0),
             POP => Pop,
             IADDL => IAddL(0),
             MOVER => MoveR(0, 0),
@@ -191,14 +192,17 @@ impl Cpu {
             crate::constants::JOV => JOV(0),
             crate::constants::JMP => JMP(0),
             SUB => Sub(0, 0),
-            ICMP => ICmp(0,0),
-            ICMPL => ICmpL(0,0),
+            ICMP => ICmp(0, 0),
+            ICMPL => ICmpL(0, 0),
+            IPUSHL => IPushL(0),
             _ => Unknown,
         }
     }
 
     /// Decode the curent opcode in IR into an instruction,
     /// assigning data where it needs to go when needed
+    /// For instructions that dont need extra registers to properly run, this function is mostly
+    /// for show, as we still decode the instruction in the execute step using a pattern match
     fn decode(&mut self) -> Instruction {
         let op_code = mask_bit_group(self.ir, 0);
 
@@ -253,18 +257,20 @@ impl Cpu {
             }
             Sub(_, _) => Sub(group1, group2),
             IPush(_) => {
-                self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
+                // self.tr = ((group1 as u16) | ((group2 as u16) << 8)) as u32;
                 IPush((group1 as u16) | ((group2 as u16) << 8))
             }
             Pop => Pop,
             Dump => Dump,
             Unknown => Unknown,
-            ICmp(_, _) => {
-                ICmp(group1,(group1 as u16) | ((group2 as u16) << 8))
-            }
+            ICmp(_, _) => ICmp(group1, (group2 as u16) | ((group3 as u16) << 8)),
             ICmpL(_, _) => {
                 self.fetch_value_tr();
-                ICmpL(group1,self.tr)
+                ICmpL(group1, self.tr)
+            }
+            IPushL(_) => {
+                self.fetch_value_tr();
+                IPushL(self.tr)
             }
         }
     }
@@ -325,7 +331,9 @@ impl Cpu {
                 self.dump();
             }
             IPush(_) => {
-                *self.dram.get_mut(self.sp as usize).unwrap() = self.tr;
+                let v1 =
+                    (mask_bit_group(self.ir, 1) as u32) | (mask_bit_group(self.ir, 2) as u32) << 8;
+                *self.dram.get_mut(self.sp as usize).unwrap() = v1 as u32;
                 self.zero_flag = self.tr == 0;
                 self.sp += 1;
             }
@@ -353,7 +361,7 @@ impl Cpu {
                 self.print_inpr_regs();
                 let v1 = self.get_reg(mask_bit_group(self.ir, 1)).clone();
                 let v2 = self.get_reg(mask_bit_group(self.ir, 2)).clone();
-                self.cmp_num(v1,v2);
+                self.cmp_num(v1, v2);
             }
             JE(_) => {
                 if self.eq_flag {
@@ -398,14 +406,20 @@ impl Cpu {
             }
             ICmp(_, _) => {
                 self.print_inpr_reg();
-                let v1 = self.get_reg(mask_bit_group(self.ir,1)).clone();
-                let v2 = (mask_bit_group(self.ir,2).clone() as u32) | (mask_bit_group(self.ir, 3) as u32) << 16;
-                self.cmp_num(v1,v2);
+                let v1 = self.get_reg(mask_bit_group(self.ir, 1)).clone();
+                let v2 = (mask_bit_group(self.ir, 2).clone() as u32)
+                    | (mask_bit_group(self.ir, 3) as u32) << 16;
+                self.cmp_num(v1, v2);
             }
             ICmpL(_, _) => {
                 self.print_inpr_reg();
                 let v1 = self.get_reg(mask_bit_group(self.ir, 1)).clone();
-                self.cmp_num(v1,self.tr);
+                self.cmp_num(v1, self.tr);
+            }
+            IPushL(_) => {
+                *self.dram.get_mut(self.sp as usize).unwrap() = self.tr;
+                self.zero_flag = self.tr == 0;
+                self.sp += 1;
             }
         }
         println!();
@@ -413,8 +427,7 @@ impl Cpu {
 
     /// Compare both input numbers and assign flag states
     fn cmp_num(&mut self, num1: u32, num2: u32) {
-        match (num1).cmp(&num2)
-        {
+        match (num1).cmp(&num2) {
             Ordering::Less => {
                 self.lt_flag = true;
                 self.eq_flag = false;
@@ -514,14 +527,14 @@ impl Cpu {
             let inst_text = {
                 let inst_enum = Cpu::decode_inst(mask_bit_group(*data, 0));
                 let args_text = match inst_enum {
-                    IMoveL(_, _) | ICmpL(_,_) => {
+                    IMoveL(_, _) | ICmpL(_, _) => {
                         format!(
                             "{} {}",
                             get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
                             self.dram.get(index + 1).unwrap()
                         )
                     }
-                    IAddL(_) => {
+                    IAddL(_) | IPushL(_) => {
                         format!("{}", self.dram.get(index + 1).unwrap())
                     }
                     JE(_) | JGT(_) | JLT(_) | JZ(_) | JOV(_) | JMP(_) => {
@@ -543,7 +556,7 @@ impl Cpu {
                         )
                     }
                     Pop | Dump | Unknown => "".to_string(),
-                    ICmp(_, _) => { "ICmp".to_string() }
+                    ICmp(_, _) => "ICmp".to_string(),
                 };
 
                 let inst_fmt = format!(
