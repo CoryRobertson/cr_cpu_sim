@@ -60,6 +60,7 @@ impl ProgramFile {
                     index,
                     line.split_whitespace()
                         .map(|item| item.to_string())
+                        .take_while(|item| !item.contains(';'))
                         .collect::<Vec<String>>(),
                 )
             })
