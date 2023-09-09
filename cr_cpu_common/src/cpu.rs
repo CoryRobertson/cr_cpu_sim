@@ -8,6 +8,7 @@ use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
 use std::fs::File;
+use std::io;
 use std::io::Read;
 use std::path::PathBuf;
 
@@ -53,6 +54,12 @@ pub struct Cpu {
     // TODO: flags?
 }
 
+impl Default for Cpu {
+    fn default() -> Self {
+        Cpu::new()
+    }
+}
+
 #[allow(dead_code)]
 impl Cpu {
     pub fn new() -> Self {
@@ -80,9 +87,9 @@ impl Cpu {
     }
 
     /// Interpret a binary and create a cpu from it, this binary is not checked for validity
-    pub fn from_binary(path: PathBuf) -> Self {
+    pub fn from_binary(path: PathBuf) -> Result<Self, io::Error> {
         let mut cpu = Self::new();
-        let mut file = File::open(&path).unwrap();
+        let mut file = File::open(&path)?;
         let mut buf = vec![];
         file.read_to_end(&mut buf).unwrap();
         let mut iter = buf.iter();
@@ -114,7 +121,7 @@ impl Cpu {
             }
         }
 
-        cpu
+        Ok(cpu)
     }
 
     /// Force an instruction into a given location, overwriting what ever is there
@@ -199,7 +206,7 @@ impl Cpu {
         }
     }
 
-    /// Decode the curent opcode in IR into an instruction,
+    /// Decode the current opcode in IR into an instruction,
     /// assigning data where it needs to go when needed
     /// For instructions that dont need extra registers to properly run, this function is mostly
     /// for show, as we still decode the instruction in the execute step using a pattern match
@@ -333,7 +340,7 @@ impl Cpu {
             IPush(_) => {
                 let v1 =
                     (mask_bit_group(self.ir, 1) as u32) | (mask_bit_group(self.ir, 2) as u32) << 8;
-                *self.dram.get_mut(self.sp as usize).unwrap() = v1 as u32;
+                *self.dram.get_mut(self.sp as usize).unwrap() = v1;
                 self.zero_flag = self.tr == 0;
                 self.sp += 1;
             }
@@ -359,8 +366,8 @@ impl Cpu {
             }
             Cmp(_, _) => {
                 self.print_inpr_regs();
-                let v1 = self.get_reg(mask_bit_group(self.ir, 1)).clone();
-                let v2 = self.get_reg(mask_bit_group(self.ir, 2)).clone();
+                let v1 = *self.get_reg(mask_bit_group(self.ir, 1));
+                let v2 = *self.get_reg(mask_bit_group(self.ir, 2));
                 self.cmp_num(v1, v2);
             }
             JE(_) => {
@@ -406,14 +413,14 @@ impl Cpu {
             }
             ICmp(_, _) => {
                 self.print_inpr_reg();
-                let v1 = self.get_reg(mask_bit_group(self.ir, 1)).clone();
-                let v2 = (mask_bit_group(self.ir, 2).clone() as u32)
-                    | (mask_bit_group(self.ir, 3) as u32) << 16;
+                let v1 = *self.get_reg(mask_bit_group(self.ir, 1));
+                let v2 =
+                    (mask_bit_group(self.ir, 2) as u32) | (mask_bit_group(self.ir, 3) as u32) << 16;
                 self.cmp_num(v1, v2);
             }
             ICmpL(_, _) => {
                 self.print_inpr_reg();
-                let v1 = self.get_reg(mask_bit_group(self.ir, 1)).clone();
+                let v1 = *self.get_reg(mask_bit_group(self.ir, 1));
                 self.cmp_num(v1, self.tr);
             }
             IPushL(_) => {
@@ -508,6 +515,7 @@ impl Cpu {
     /// Prints a very friendly dump of all necessary values to debug the cpu :)
     fn dump(&self) {
         println!("CPU Dump:");
+        // print registers
         println!("acc: {0:#034b} : {0:#X} : {0}", self.acc);
         println!("cr: {0:#034b} : {0:#X} : {0}", self.cr);
         println!("pc: {0:#034b} : {0:#X} : {0}", self.pc);
@@ -517,15 +525,20 @@ impl Cpu {
         // println!("inpr2: {0:#034b} : {0:#X} : {0}", self.inpr2);
         println!("sp: {0:#034b} : {0:#X} : {0}", self.sp);
         println!("tr: {0:#034b} : {0:#X} : {0}", self.tr);
+        // print flags
         println!("Zero flag: {}", self.zero_flag);
         println!("LT flag: {}", self.lt_flag);
         println!("GT flag: {}", self.gt_flag);
         println!("EQ flag: {}", self.eq_flag);
         println!("OV flag: {}", self.ov_flag);
 
+        // print out dram
         for (index, data) in self.dram.iter().enumerate() {
+            // convert each line in dram into text in the form of an instruction
             let inst_text = {
+                // get the instruction enum from the opcode in dram
                 let inst_enum = Cpu::decode_inst(mask_bit_group(*data, 0));
+                // get the arguments of the instruction, this depends on the type of instruction
                 let args_text = match inst_enum {
                     IMoveL(_, _) | ICmpL(_, _) => {
                         format!(
@@ -556,19 +569,27 @@ impl Cpu {
                         )
                     }
                     Pop | Dump | Unknown => "".to_string(),
-                    ICmp(_, _) => "ICmp".to_string(),
+                    ICmp(_, _) => {
+                        format!(
+                            "{} {}",
+                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
+                            (mask_bit_group(*data, 2) as u32)
+                                | (mask_bit_group(*data, 3) as u32) << 8
+                        )
+                    }
                 };
 
-                let inst_fmt = format!(
+                // format the instruction nicely as text
+                format!(
                     "{} {}",
                     { format!("{inst_enum:?}").replace('0', "") },
                     args_text
                 )
-                .replace(['(', ')', ','], "");
-
-                inst_fmt
+                .replace(['(', ')', ','], "")
             };
+            // only display the dram line if there is any data, a full zero dram value represents unused memory most likely
             if *data != 0 {
+                // print each dram address giving the index, the value in binary, the value in decimal, then hexidecimal, then as instruction text
                 println!("[{index}] = {:#034b} : {0} : {0:#X} : {}", data, inst_text);
             }
         }

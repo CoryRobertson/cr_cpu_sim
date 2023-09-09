@@ -1,6 +1,5 @@
 use crate::program_instruction::ProgramInstruction;
 use crate::program_instruction::ProgramInstruction::*;
-use crate::{is_jump, is_label};
 use cr_cpu_common::instruction::Instruction;
 use cr_cpu_common::prelude::Cpu;
 use std::collections::HashMap;
@@ -9,6 +8,7 @@ use std::io;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
+/// ProgramFile represents a single file of assembly that can be built into a cpu struct
 pub struct ProgramFile {
     lines: Vec<String>,
     labels: HashMap<String, u32>,
@@ -17,7 +17,8 @@ pub struct ProgramFile {
 }
 
 impl ProgramFile {
-    pub(crate) fn new(path: PathBuf, output_path: PathBuf) -> Result<Self, io::Error> {
+    /// Create a new program file from a source code path, and an output path
+    pub fn new(path: PathBuf, output_path: PathBuf) -> Result<Self, io::Error> {
         Ok(Self {
             lines: {
                 let mut s = String::new();
@@ -30,14 +31,34 @@ impl ProgramFile {
         })
     }
 
+    /// Create a program file struct from just a program binary
+    pub fn new_from_binary(path: PathBuf) -> Result<Self, io::Error> {
+        Ok(Self {
+            lines: vec![],
+            labels: Default::default(),
+            output_path: path.clone(),
+            cpu: Cpu::from_binary(path)?,
+        })
+    }
+
+    /// Run the stored binary from the output path
     pub fn run_binary(&mut self) {
-        self.cpu = Cpu::from_binary(self.output_path.clone());
         self.run();
     }
+
+    /// Read the binary stored in output path,
+    /// parse it, and modify the cpu struct inside the program file
+    pub fn read_binary(&mut self) -> Result<(), io::Error> {
+        self.cpu = Cpu::from_binary(self.output_path.clone())?;
+        Ok(())
+    }
+
+    /// Convert the stored input file data into a cpu struct, and store the cpu struct in self
     pub fn compile(&mut self) {
         self.cpu = Cpu::new();
         let mut instructions: Vec<ProgramInstruction> = vec![];
 
+        // local function to determine the number of added lines given multiline instructions
         let added_lines = |list: &Vec<ProgramInstruction>| -> u32 {
             list.iter()
                 .filter_map(|inst| match inst {
@@ -50,6 +71,7 @@ impl ProgramFile {
                 .sum()
         };
 
+        // iterate through every program line, filtering as needed
         for (line_index, line) in self
             .lines
             .iter()
@@ -161,7 +183,39 @@ impl ProgramFile {
         let mut file = File::create(&self.output_path).unwrap();
         for inst in self.cpu.get_dram() {
             let bytes = inst.to_le_bytes().to_vec();
-            file.write(bytes.as_slice()).unwrap();
+            let _ = file.write(bytes.as_slice()).unwrap();
         }
     }
+}
+
+/// Returns true if the given item is a label, requirements being that it starts and ends with ':'
+/// e.g. `:this_is_a_label:`
+fn is_label(item: &str) -> bool {
+    item.starts_with(':') && item.ends_with(':')
+}
+
+/// Returns true if a given line and secondary line item is a jump instruction
+fn is_jump(item: &str, label: &str) -> Option<(Instruction, String)> {
+    // item.eq("jmp") || item.eq("jlt") || item.eq("jgt") || item.eq("jov")
+    // || item.eq("jz") || item.eq("je")
+
+    // we add code line 1000 as a temporary value, since we overwrite it later in compilation anyway.
+    // we also use 0 added lines, since that will also be overwritten
+    let inst = Instruction::from_code_line(&vec![item.to_string(), "1000".to_string()], 0)?;
+
+    match inst {
+        Instruction::JMP(_)
+        | Instruction::JE(_)
+        | Instruction::JGT(_)
+        | Instruction::JLT(_)
+        | Instruction::JZ(_)
+        | Instruction::JOV(_) => {
+            // do nothing, since the instruction is as expected!
+        }
+        _ => {
+            return None;
+        }
+    }
+
+    Some((inst, label.to_string()))
 }

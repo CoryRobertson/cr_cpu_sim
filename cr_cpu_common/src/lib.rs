@@ -13,7 +13,8 @@ pub mod prelude {
 
 pub fn mask_bit_group(input: u32, group: u8) -> u8 {
     assert!((0..=3).contains(&(group as i32)));
-    ((input & 0xFF << (group * 8)) >> group * 8) as u8
+    ((input & 0xFF << (group * 8)) >> (group * 8)) as u8
+    // ((input & 0xFF << (group * 8)) >> group * 8) as u8
 }
 
 #[macro_export]

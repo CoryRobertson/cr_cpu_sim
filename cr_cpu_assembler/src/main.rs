@@ -1,53 +1,41 @@
 use crate::program_file::ProgramFile;
-use cr_cpu_common::instruction::Instruction;
-use std::fs;
 use std::fs::File;
+use std::path::PathBuf;
+use std::{env, fs};
 
 mod program_file;
 mod program_instruction;
 
 fn main() {
-    #[cfg(debug_assertions)]
-    let _ = fs::remove_file("./code.bin");
-    let mut pf = ProgramFile::new("code.cr".into(), "code.bin".into()).unwrap();
-    // if a binary exists, run it, else create one from the code file
-    if File::open("code.bin").is_ok() {
-        pf.run_binary();
-    } else {
-        pf.compile();
-        pf.output_binary();
-        pf.run_binary();
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 1 {
+        // default compile and run code.cr -> code.bin
         #[cfg(debug_assertions)]
         let _ = fs::remove_file("./code.bin");
-    }
-}
-
-/// Returns true if the given item is a label, requirements being that it starts and ends with ':'
-/// e.g. `:this_is_a_label:`
-fn is_label(item: &str) -> bool {
-    item.starts_with(':') && item.ends_with(':')
-}
-
-/// Returns true if a given line and secondary line item is a jump instruction
-fn is_jump(item: &str, label: &str) -> Option<(Instruction, String)> {
-    // item.eq("jmp") || item.eq("jlt") || item.eq("jgt") || item.eq("jov")
-    // || item.eq("jz") || item.eq("je")
-
-    let inst = Instruction::from_code_line(&vec![item.to_string(), "1000".to_string()], 0)?;
-
-    match inst {
-        Instruction::JMP(_)
-        | Instruction::JE(_)
-        | Instruction::JGT(_)
-        | Instruction::JLT(_)
-        | Instruction::JZ(_)
-        | Instruction::JOV(_) => {
-            // do nothing, since the instruction is as expected!
+        let mut pf = ProgramFile::new("code.cr".into(), "code.bin".into()).unwrap();
+        // if a binary exists, run it, else create one from the code file
+        if File::open("code.bin").is_ok() {
+            pf.run_binary();
+        } else {
+            pf.compile();
+            pf.output_binary();
+            pf.read_binary().unwrap();
+            pf.run_binary();
+            #[cfg(debug_assertions)]
+            let _ = fs::remove_file("./code.bin");
         }
-        _ => {
-            return None;
-        }
+    } else if args.len() == 2 {
+        // directly run a binary given a filename
+        let binary_file = args.get(1).unwrap();
+        let mut pf = ProgramFile::new_from_binary(binary_file.into()).unwrap();
+        pf.run_binary();
+    } else if args.len() == 3 {
+        // convert source code into a binary
+        let input_file = args.get(1).unwrap();
+        let output_file = args.get(2).unwrap();
+        let mut pf =
+            ProgramFile::new(PathBuf::from(input_file), PathBuf::from(output_file)).unwrap();
+        pf.compile();
+        pf.output_binary();
     }
-
-    Some((inst, label.to_string()))
 }
