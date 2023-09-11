@@ -1,10 +1,10 @@
 use crate::constants::{
-    get_id_from_reg_name, ADD, CMP, DUMP, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL, ISUB,
-    MOVER, POP, SUB,
+    get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL,
+    ISUB, MOVER, POP, PUSH, SUB,
 };
 use crate::instruction::Instruction::{
-    Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, MoveR, Pop, Sub, Unknown, JE,
-    JMP, JOV, JZ,
+    Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, MoveR, Pop, Push, Sub,
+    Unknown, JE, JMP, JOV, JZ,
 };
 use crate::prelude::{Cmp, JGT, JLT};
 
@@ -42,11 +42,13 @@ pub enum Instruction {
     Sub(u8, u8),
     /// Push number to stack
     IPush(u16),
+    Push(u8),
     /// Push long number to stack
     IPushL(u32),
     /// Pops the current stack pointer address into the output register
     Pop,
     Dump,
+    DumpR(u8),
     Unknown,
 }
 
@@ -137,6 +139,14 @@ impl Instruction {
                 let inst: u32 = IPUSHL as u32;
                 vec![inst, *number]
             }
+            Push(reg0) => {
+                let inst: u32 = PUSH as u32 | (*reg0 as u32) << 8;
+                vec![inst]
+            }
+            Instruction::DumpR(reg0) => {
+                let inst: u32 = DUMPR as u32 | (*reg0 as u32) << 8;
+                vec![inst]
+            }
         }
     }
 
@@ -160,6 +170,10 @@ impl Instruction {
             "dump" => {
                 if line.len() == 1 {
                     return Some(Dump);
+                }
+                if line.len() == 2 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    return Some(Instruction::DumpR(reg0id));
                 }
             }
             "move" => {
@@ -256,8 +270,13 @@ impl Instruction {
             }
             "push" => {
                 if line.len() == 2 {
-                    let val: u32 = line.get(1)?.parse().ok()?;
-                    return Some(IPush(val as u16));
+                    if let Ok(literal_num) = line.get(1)?.parse::<u16>() {
+                        return Some(IPush(literal_num));
+                    }
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    return Some(Push(reg0id));
+                    // let val: u32 = line.get(1)?.parse().ok()?;
+                    // return Some(IPush(val as u16));
                 }
             }
             "ipushl" => {

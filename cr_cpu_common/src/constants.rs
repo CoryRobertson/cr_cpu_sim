@@ -40,6 +40,7 @@ pub const SUB: u8 = 0x1B;
 
 /// Push instruction opcode
 pub const IPUSH: u8 = 0x0C;
+pub const PUSH: u8 = 0x3C;
 pub const IPUSHL: u8 = 0x2C;
 
 /// Pop instruction opcode
@@ -47,6 +48,7 @@ pub const POP: u8 = 0x1C;
 
 /// Dump instruction opcode
 pub const DUMP: u8 = 0xFF;
+pub const DUMPR: u8 = 0xEF;
 
 // init consts
 pub const EMPTY_REGISTER: u32 = 0x00;

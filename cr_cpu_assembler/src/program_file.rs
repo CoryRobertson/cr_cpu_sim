@@ -1,5 +1,6 @@
 use crate::program_instruction::ProgramInstruction;
 use crate::program_instruction::ProgramInstruction::*;
+use cr_cpu_common::constants::get_id_from_reg_name;
 use cr_cpu_common::instruction::Instruction;
 use cr_cpu_common::prelude::Cpu;
 use std::collections::HashMap;

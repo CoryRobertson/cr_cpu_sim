@@ -1,8 +1,8 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
 use crate::instruction::Instruction::{
-    Add, Cmp, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, MoveR, Sub, Unknown, JE, JGT,
-    JLT, JMP, JOV, JZ,
+    Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, MoveR, Push, Sub,
+    Unknown, JE, JGT, JLT, JMP, JOV, JZ,
 };
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
@@ -202,6 +202,8 @@ impl Cpu {
             ICMP => ICmp(0, 0),
             ICMPL => ICmpL(0, 0),
             IPUSHL => IPushL(0),
+            PUSH => Push(0),
+            DUMPR => DumpR(0),
             _ => Unknown,
         }
     }
@@ -279,6 +281,8 @@ impl Cpu {
                 self.fetch_value_tr();
                 IPushL(self.tr)
             }
+            Push(_) => Push(group1),
+            DumpR(_) => DumpR(group1),
         }
     }
 
@@ -345,9 +349,11 @@ impl Cpu {
                 self.sp += 1;
             }
             Pop => {
+                // it is very possible to pop all the way through all of the ram to index 0, or beyond the maximum size of dram, not sure if this matters though.
                 self.sp -= 1;
                 self.or = *self.dram.get(self.sp as usize).unwrap();
                 *self.dram.get_mut(self.sp as usize).unwrap() = 0;
+                println!("Popped value: {}", self.or);
                 self.zero_flag = self.or == 0;
             }
             Add(_, _) => {
@@ -427,6 +433,18 @@ impl Cpu {
                 *self.dram.get_mut(self.sp as usize).unwrap() = self.tr;
                 self.zero_flag = self.tr == 0;
                 self.sp += 1;
+            }
+            Push(_) => {
+                let reg_id = mask_bit_group(self.ir, 1);
+                self.print_inpr_reg();
+                *self.dram.get_mut(self.sp as usize).unwrap() = *self.get_reg(reg_id);
+                self.zero_flag = *self.dram.get(self.sp as usize).unwrap() == 0;
+                self.sp += 1;
+            }
+            DumpR(_) => {
+                let reg_id = mask_bit_group(self.ir, 1);
+                self.print_inpr_reg();
+                self.dump_reg(reg_id);
             }
         }
         println!();
@@ -512,6 +530,36 @@ impl Cpu {
     //     format!("{reg_name}: {0:#034b} : {0:#X} : {0}", reg_val)
     // }
 
+    fn dump_reg(&self, reg: u8) {
+        match reg {
+            ACC => {
+                println!("acc: {0:#034b} : {0:#X} : {0}", self.acc);
+            }
+            PC => {
+                println!("pc: {0:#034b} : {0:#X} : {0}", self.pc);
+            }
+            IR => {
+                println!("ir: {0:#034b} : {0:#X} : {0}", self.ir);
+            }
+            OR => {
+                println!("or: {0:#034b} : {0:#X} : {0}", self.or);
+            }
+            SP => {
+                println!("sp: {0:#034b} : {0:#X} : {0}", self.sp);
+            }
+            TR => {
+                println!("tr: {0:#034b} : {0:#X} : {0}", self.tr);
+            }
+            CR => {
+                println!("cr: {0:#034b} : {0:#X} : {0}", self.cr);
+            }
+            _ => {
+                println!("Unexpected reg dump");
+                dbg!(reg);
+            }
+        }
+    }
+
     /// Prints a very friendly dump of all necessary values to debug the cpu :)
     fn dump(&self) {
         println!("CPU Dump:");
@@ -540,6 +588,7 @@ impl Cpu {
                 let inst_enum = Cpu::decode_inst(mask_bit_group(*data, 0));
                 // get the arguments of the instruction, this depends on the type of instruction
                 let args_text = match inst_enum {
+                    // parse register id and u32 long on next dram address
                     IMoveL(_, _) | ICmpL(_, _) => {
                         format!(
                             "{} {}",
@@ -547,18 +596,22 @@ impl Cpu {
                             self.dram.get(index + 1).unwrap()
                         )
                     }
+                    // parse u32 long on next dram address
                     IAddL(_) | IPushL(_) => {
                         format!("{}", self.dram.get(index + 1).unwrap())
                     }
+                    // single 16 bit literal parse group
                     JE(_) | JGT(_) | JLT(_) | JZ(_) | JOV(_) | JMP(_) => {
                         format!("{}", mask_bit_group(*data, 1))
                     }
+                    // one literal u8 parse group
                     ISub(_) | IAdd(_) | IPush(_) => {
                         format!(
                             "{}",
                             (mask_bit_group(*data, 2) as u16) // | ((mask_bit_group(*data, 2) as u16) << 8)
                         )
                     }
+                    // two register parse group
                     Sub(_, _) | Add(_, _) | Cmp(_, _) | MoveR(_, _) => {
                         format!(
                             "{} {}",
@@ -568,13 +621,22 @@ impl Cpu {
                                 .unwrap_or("Unknown".to_string())
                         )
                     }
+                    // no args parse group
                     Pop | Dump | Unknown => "".to_string(),
+                    // one register one 16 bit literal parse group
                     ICmp(_, _) => {
                         format!(
                             "{} {}",
                             get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
                             (mask_bit_group(*data, 2) as u32)
                                 | (mask_bit_group(*data, 3) as u32) << 8
+                        )
+                    }
+                    // single register only parse group
+                    Push(_) | DumpR(_) => {
+                        format!(
+                            "{}",
+                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap()
                         )
                     }
                 };
@@ -588,7 +650,9 @@ impl Cpu {
                 .replace(['(', ')', ','], "")
             };
             // only display the dram line if there is any data, a full zero dram value represents unused memory most likely
-            if *data != 0 {
+            if *data != 0
+                || (index >= (DRAM_SIZE - (DRAM_SIZE / 4)) as usize && index < self.sp as usize)
+            {
                 // print each dram address giving the index, the value in binary, the value in decimal, then hexidecimal, then as instruction text
                 println!("[{index}] = {:#034b} : {0} : {0:#X} : {}", data, inst_text);
             }
