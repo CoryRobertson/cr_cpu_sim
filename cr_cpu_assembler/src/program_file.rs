@@ -17,6 +17,8 @@ pub struct ProgramFile {
     cpu: Cpu,
 }
 
+// TODO: compiler profiles, release mode skips compiling all dump instructions ? debug mode does not
+
 impl ProgramFile {
     /// Create a new program file from a source code path, and an output path
     pub fn new(path: PathBuf, output_path: PathBuf) -> Result<Self, io::Error> {
