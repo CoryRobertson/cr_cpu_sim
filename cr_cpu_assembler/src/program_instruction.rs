@@ -3,9 +3,13 @@ use cr_cpu_common::instruction::Instruction;
 #[derive(Clone, Debug)]
 pub enum ProgramInstruction {
     Asm(Instruction),
-    PreAsm(Instruction, String),
+    JumpLabel(Instruction, String),
+    LeaLabel(Instruction,String),
+    Variable(String,u32),
     Label(String),
 }
+
+
 
 // TODO: add a new program instruction, called variable
 //  variable syntax could be let x = 5

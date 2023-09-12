@@ -1,11 +1,5 @@
-use crate::constants::{
-    get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL,
-    ISUB, MOVER, POP, PUSH, SUB,
-};
-use crate::instruction::Instruction::{
-    Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, MoveR, Pop, Push, Sub,
-    Unknown, JE, JMP, JOV, JZ,
-};
+use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL, ISUB, MOVER, POP, PUSH, SUB, LEA};
+use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, MoveR, Pop, Push, Sub, Unknown, JE, JMP, JOV, JZ, Lea};
 use crate::prelude::{Cmp, JGT, JLT};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -29,6 +23,9 @@ pub enum Instruction {
     JLT(u16),
     JZ(u16),
     JOV(u16),
+
+    /// Load effective address into OR
+    Lea(u16),
 
     /// |location unused|number|location unused|opcode|
     IAdd(u8),
@@ -145,6 +142,10 @@ impl Instruction {
             }
             Instruction::DumpR(reg0) => {
                 let inst: u32 = DUMPR as u32 | (*reg0 as u32) << 8;
+                vec![inst]
+            }
+            Instruction::Lea(pc) => {
+                let inst: u32 = LEA as u32 | (*pc as u32) << 8;
                 vec![inst]
             }
         }
@@ -290,6 +291,11 @@ impl Instruction {
                     return Some(Pop);
                 }
             }
+            "lea" => {
+                if line.len() == 2 {
+                    return Some(Lea(line.get(1)?.parse().ok()?));
+                }
+            }
             _ => {}
         }
         // ipush
@@ -311,6 +317,17 @@ impl Instruction {
             }
             _ => {
                 panic!("Unexpected jump instruction, this should pretty much never happen");
+            }
+        }
+    }
+
+    pub fn change_lea(&mut self, pc: u16) {
+        match self {
+            Lea(a) => {
+                *a = pc;
+            }
+            _ => {
+                panic!("Unexpected Lea");
             }
         }
     }

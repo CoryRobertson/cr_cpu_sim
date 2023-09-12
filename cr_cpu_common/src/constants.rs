@@ -4,6 +4,8 @@
 pub const MOVER: u8 = 0x01;
 pub const IMOVEL: u8 = 0x11;
 
+pub const LEA: u8 = 0x12;
+
 /// Compare register opcode
 pub const CMP: u8 = 0x02;
 /// Immediate mode compare opcode

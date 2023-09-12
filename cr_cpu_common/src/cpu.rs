@@ -1,9 +1,6 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{
-    Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, MoveR, Push, Sub,
-    Unknown, JE, JGT, JLT, JMP, JOV, JZ,
-};
+use crate::instruction::Instruction::{Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, MoveR, Push, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ, Lea};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
@@ -84,6 +81,22 @@ impl Cpu {
 
     pub fn get_dram(&self) -> &[u32] {
         &self.dram
+    }
+
+    pub fn push_variable(&mut self, value: u32) -> u32 {
+        *self.dram.get_mut(self.sp as usize).unwrap() = value;
+        let r = self.sp;
+        self.sp += 1;
+        r
+    }
+
+    pub fn reset_sp(&mut self) {
+        let def_cpu = Cpu::default();
+        self.sp = def_cpu.sp;
+    }
+
+    pub fn get_sp(&self) -> u32 {
+        self.sp
     }
 
     /// Interpret a binary and create a cpu from it, this binary is not checked for validity
@@ -204,6 +217,7 @@ impl Cpu {
             IPUSHL => IPushL(0),
             PUSH => Push(0),
             DUMPR => DumpR(0),
+            LEA => Lea(0),
             _ => Unknown,
         }
     }
@@ -283,6 +297,7 @@ impl Cpu {
             }
             Push(_) => Push(group1),
             DumpR(_) => DumpR(group1),
+            Lea(_) => Lea((group1 as u16) | ((group2 as u16) << 8))
         }
     }
 
@@ -446,6 +461,10 @@ impl Cpu {
                 self.print_inpr_reg();
                 self.dump_reg(reg_id);
             }
+            Lea(_) => {
+                let location: u16 = (mask_bit_group(self.ir,1) as u16) | ((mask_bit_group(self.ir, 2) as u16) << 8);
+                self.or = *self.dram.get(location as usize).unwrap();
+            }
         }
         println!();
     }
@@ -601,8 +620,8 @@ impl Cpu {
                         format!("{}", self.dram.get(index + 1).unwrap())
                     }
                     // single 16 bit literal parse group
-                    JE(_) | JGT(_) | JLT(_) | JZ(_) | JOV(_) | JMP(_) => {
-                        format!("{}", mask_bit_group(*data, 1))
+                    JE(_) | JGT(_) | JLT(_) | JZ(_) | JOV(_) | JMP(_) | Lea(_) => {
+                        format!("{}", ((mask_bit_group(*data, 1) as u16) | (mask_bit_group(*data,2) as u16) << 8))
                     }
                     // one literal u8 parse group
                     ISub(_) | IAdd(_) | IPush(_) => {
