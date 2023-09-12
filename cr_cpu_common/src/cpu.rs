@@ -1,6 +1,9 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, MoveR, Push, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ, Lea, MoveA};
+use crate::instruction::Instruction::{
+    Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, Lea, LeaR, MoveA, MoveR,
+    Push, Shl, Shr, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ,
+};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
@@ -218,7 +221,10 @@ impl Cpu {
             PUSH => Push(0),
             DUMPR => DumpR(0),
             LEA => Lea(0),
-            MOVEA => MoveA(0,0),
+            MOVEA => MoveA(0, 0),
+            LEAR => LeaR(0),
+            SHL => Shl(0, 0),
+            SHR => Shr(0, 0),
             _ => Unknown,
         }
     }
@@ -299,9 +305,10 @@ impl Cpu {
             Push(_) => Push(group1),
             DumpR(_) => DumpR(group1),
             Lea(_) => Lea((group1 as u16) | ((group2 as u16) << 8)),
-            MoveA(_, _) => {
-                MoveA((group1 as u16) | ((group2 as u16) << 8),group3)
-            }
+            MoveA(_, _) => MoveA((group1 as u16) | ((group2 as u16) << 8), group3),
+            LeaR(_) => LeaR(group1),
+            Shl(_, _) => Shl(group1, group2),
+            Shr(_, _) => Shr(group1, group2),
         }
     }
 
@@ -473,14 +480,35 @@ impl Cpu {
                 self.dump_reg(reg_id);
             }
             Lea(_) => {
-                let location: u16 = (mask_bit_group(self.ir,1) as u16) | ((mask_bit_group(self.ir, 2) as u16) << 8);
+                let location: u16 = (mask_bit_group(self.ir, 1) as u16)
+                    | ((mask_bit_group(self.ir, 2) as u16) << 8);
                 self.or = *self.dram.get(location as usize).unwrap();
             }
             MoveA(_, _) => {
-                let location: u16 = (mask_bit_group(self.ir,1) as u16) | (mask_bit_group(self.ir,2) as u16);
-                let val = *self.get_reg(mask_bit_group(self.ir,3));
+                let location: u16 =
+                    (mask_bit_group(self.ir, 1) as u16) | (mask_bit_group(self.ir, 2) as u16);
+                let val = *self.get_reg(mask_bit_group(self.ir, 3));
                 self.print_inpr_reg_specific(3);
                 *self.dram.get_mut(location as usize).unwrap() = val;
+            }
+            LeaR(_) => {
+                let address = *self.get_reg(mask_bit_group(self.ir, 1));
+                self.print_inpr_reg();
+                self.or = *self.dram.get(address as usize).unwrap();
+            }
+            Shl(_, _) => {
+                self.print_inpr_reg();
+                let ir = self.ir;
+                let reg = self.get_reg(mask_bit_group(self.ir, 1));
+                *reg <<= mask_bit_group(ir, 2);
+                self.zero_flag = *reg == 0;
+            }
+            Shr(_, _) => {
+                self.print_inpr_reg();
+                let ir = self.ir;
+                let reg = self.get_reg(mask_bit_group(self.ir, 1));
+                *reg >>= mask_bit_group(ir, 2);
+                self.zero_flag = *reg == 0;
             }
         }
         println!();
@@ -638,7 +666,11 @@ impl Cpu {
                     }
                     // single 16 bit literal parse group
                     JE(_) | JGT(_) | JLT(_) | JZ(_) | JOV(_) | JMP(_) | Lea(_) => {
-                        format!("{}", ((mask_bit_group(*data, 1) as u16) | (mask_bit_group(*data,2) as u16) << 8))
+                        format!(
+                            "{}",
+                            ((mask_bit_group(*data, 1) as u16)
+                                | (mask_bit_group(*data, 2) as u16) << 8)
+                        )
                     }
                     // one literal u8 parse group
                     ISub(_) | IAdd(_) | IPush(_) => {
@@ -669,14 +701,23 @@ impl Cpu {
                         )
                     }
                     // single register only parse group
-                    Push(_) | DumpR(_) => {
+                    Push(_) | DumpR(_) | LeaR(_) => get_name_from_reg_id(mask_bit_group(*data, 1))
+                        .unwrap()
+                        .to_string(),
+                    MoveA(_, _) => {
                         format!(
-                            "{}",
-                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap()
+                            "{} {}",
+                            (mask_bit_group(*data, 1) as u16)
+                                | (mask_bit_group(*data, 2) as u16) << 8,
+                            mask_bit_group(*data, 3)
                         )
                     }
-                    MoveA(_, _) => {
-                        format!("{} {}", (mask_bit_group(*data,1) as u16) | (mask_bit_group(*data,2) as u16) << 8, mask_bit_group(*data,3))
+                    Shr(_, _) | Shl(_, _) => {
+                        format!(
+                            "{} {}",
+                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
+                            mask_bit_group(*data, 2)
+                        )
                     }
                 };
 

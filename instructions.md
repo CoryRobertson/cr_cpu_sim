@@ -48,6 +48,18 @@ sub acc or
 ```
 Subtracts the output register from the **acc** register, storing the outcome in **acc**
 
+### Shift Left & Right:
+Register mode:
+```
+shl acc 2
+```
+Shift the acc register left by two bits
+
+```
+shr acc 2
+```
+Shift the acc register right by two bits
+
 ### Dump
 ```
 dump

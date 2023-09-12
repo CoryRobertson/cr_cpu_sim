@@ -1,5 +1,11 @@
-use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL, ISUB, MOVER, POP, PUSH, SUB, LEA, MOVEA};
-use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, MoveR, Pop, Push, Sub, Unknown, JE, JMP, JOV, JZ, Lea, MoveA};
+use crate::constants::{
+    get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL,
+    ISUB, LEA, LEAR, MOVEA, MOVER, POP, PUSH, SHL, SHR, SUB,
+};
+use crate::instruction::Instruction::{
+    Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Pop,
+    Push, Shl, Shr, Sub, Unknown, JE, JMP, JOV, JZ,
+};
 use crate::prelude::{Cmp, JGT, JLT};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -10,7 +16,7 @@ pub enum Instruction {
     IMoveL(u8, u32),
 
     /// Move register into dram address
-    MoveA(u16,u8),
+    MoveA(u16, u8),
 
     /// Compare register 0 and register 1, changing flags when necessary
     Cmp(u8, u8),
@@ -18,6 +24,11 @@ pub enum Instruction {
     ICmp(u8, u16),
     /// Compare register 0 and an immediate long number
     ICmpL(u8, u32),
+
+    Shl(u8, u8),
+    Shr(u8, u8),
+
+    // TODO: bitwise AND, bitwise OR, bitwise XOR, bitwise NOT instructions
 
     /// Jump instructions, sets pc to the value given
     JE(u16),
@@ -29,6 +40,7 @@ pub enum Instruction {
 
     /// Load effective address into OR
     Lea(u16),
+    LeaR(u8),
 
     /// |location unused|number|location unused|opcode|
     IAdd(u8),
@@ -151,9 +163,19 @@ impl Instruction {
                 let inst: u32 = LEA as u32 | (*pc as u32) << 8;
                 vec![inst]
             }
-            MoveA(v, a) => {
-                let inst: u32 = MOVEA as u32 | (*v as u32) << 8 | (*a as u32) << 24;
+            MoveA(address, reg0) => {
+                let inst: u32 = MOVEA as u32 | (*address as u32) << 8 | (*reg0 as u32) << 24;
                 vec![inst]
+            }
+            LeaR(reg) => {
+                let inst: u32 = LEAR as u32 | (*reg as u32) << 8;
+                vec![inst]
+            }
+            Instruction::Shl(reg, amnt) => {
+                vec![(SHL as u32 | (*reg as u32) << 8) | (*amnt as u32) << 16]
+            }
+            Instruction::Shr(reg, amnt) => {
+                vec![(SHR as u32 | (*reg as u32) << 8) | (*amnt as u32) << 16]
             }
         }
     }
@@ -300,13 +322,30 @@ impl Instruction {
             }
             "lea" => {
                 if line.len() == 2 {
-                    return Some(Lea(line.get(1)?.parse().ok()?));
+                    return if let Ok(number) = line.get(1)?.parse::<u16>() {
+                        Some(Lea(number))
+                    } else {
+                        let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                        Some(LeaR(reg0id))
+                    };
                 }
             }
             "movea" => {
                 if line.len() == 3 {
                     let reg0id: u8 = get_id_from_reg_name(line.get(2)?)?;
-                    return Some(MoveA(line.get(1)?.parse().ok()?,reg0id));
+                    return Some(MoveA(line.get(1)?.parse().ok()?, reg0id));
+                }
+            }
+            "shr" => {
+                if line.len() == 3 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    return Some(Shr(reg0id, line.get(2)?.parse().ok()?));
+                }
+            }
+            "shl" => {
+                if line.len() == 3 {
+                    let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
+                    return Some(Shl(reg0id, line.get(2)?.parse().ok()?));
                 }
             }
             _ => {}

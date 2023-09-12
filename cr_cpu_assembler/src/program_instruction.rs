@@ -14,4 +14,3 @@ pub enum ProgramInstruction {
 //  all variables could take spaces in stack ? or the second quarter of dram?
 //  if variables take up stack space, then the stack pointer needs to start after all variable declarations, which could be done with a simple instruction aded to the beginning of every binary
 //  this would be something like `imovel sp <number of variables found in binary at compile time>`
-

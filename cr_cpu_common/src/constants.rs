@@ -5,7 +5,12 @@ pub const MOVER: u8 = 0x01;
 pub const IMOVEL: u8 = 0x11;
 pub const MOVEA: u8 = 0x13;
 
+/// Load effective address
 pub const LEA: u8 = 0x12;
+/// Load effective address register
+pub const LEAR: u8 = 0x14;
+pub const SHL: u8 = 0x15;
+pub const SHR: u8 = 0x16;
 
 /// Compare register opcode
 pub const CMP: u8 = 0x02;

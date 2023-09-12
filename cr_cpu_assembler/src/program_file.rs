@@ -1,6 +1,5 @@
 use crate::program_instruction::ProgramInstruction;
 use crate::program_instruction::ProgramInstruction::*;
-use cr_cpu_common::constants::get_id_from_reg_name;
 use cr_cpu_common::instruction::Instruction;
 use cr_cpu_common::prelude::Cpu;
 use std::collections::HashMap;
@@ -107,6 +106,8 @@ impl ProgramFile {
                             // PreAsm is an instruction that represents another instruction that is going to be formed by the compiler
                             // at the moment, a jump instruction that contains a label will become a preasm instruction
                             instructions.push(PreAsm(inst, label));
+                        } else {
+                            panic!("Unexpected item in line {}: {:?}", line_index + 1, line);
                         }
                     }
                     (_, _) => {
