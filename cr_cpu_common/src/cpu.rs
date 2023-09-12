@@ -1,6 +1,6 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, MoveR, Push, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ, Lea};
+use crate::instruction::Instruction::{Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, MoveR, Push, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ, Lea, MoveA};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
@@ -218,6 +218,7 @@ impl Cpu {
             PUSH => Push(0),
             DUMPR => DumpR(0),
             LEA => Lea(0),
+            MOVEA => MoveA(0,0),
             _ => Unknown,
         }
     }
@@ -297,7 +298,10 @@ impl Cpu {
             }
             Push(_) => Push(group1),
             DumpR(_) => DumpR(group1),
-            Lea(_) => Lea((group1 as u16) | ((group2 as u16) << 8))
+            Lea(_) => Lea((group1 as u16) | ((group2 as u16) << 8)),
+            MoveA(_, _) => {
+                MoveA((group1 as u16) | ((group2 as u16) << 8),group3)
+            }
         }
     }
 
@@ -314,6 +318,13 @@ impl Cpu {
     /// Print bit mask ground 1 from IR, typically the first inpr
     fn print_inpr_reg(&self) -> Option<()> {
         let inpr1 = mask_bit_group(self.ir, 1);
+        let reg0 = get_name_from_reg_id(inpr1)?;
+        println!("{inpr1}: {reg0}");
+        Some(())
+    }
+
+    fn print_inpr_reg_specific(&self, group: u8) -> Option<()> {
+        let inpr1 = mask_bit_group(self.ir, group);
         let reg0 = get_name_from_reg_id(inpr1)?;
         println!("{inpr1}: {reg0}");
         Some(())
@@ -464,6 +475,12 @@ impl Cpu {
             Lea(_) => {
                 let location: u16 = (mask_bit_group(self.ir,1) as u16) | ((mask_bit_group(self.ir, 2) as u16) << 8);
                 self.or = *self.dram.get(location as usize).unwrap();
+            }
+            MoveA(_, _) => {
+                let location: u16 = (mask_bit_group(self.ir,1) as u16) | (mask_bit_group(self.ir,2) as u16);
+                let val = *self.get_reg(mask_bit_group(self.ir,3));
+                self.print_inpr_reg_specific(3);
+                *self.dram.get_mut(location as usize).unwrap() = val;
             }
         }
         println!();
@@ -657,6 +674,9 @@ impl Cpu {
                             "{}",
                             get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap()
                         )
+                    }
+                    MoveA(_, _) => {
+                        format!("{} {}", (mask_bit_group(*data,1) as u16) | (mask_bit_group(*data,2) as u16) << 8, mask_bit_group(*data,3))
                     }
                 };
 

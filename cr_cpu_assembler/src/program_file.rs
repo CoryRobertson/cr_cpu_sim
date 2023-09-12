@@ -1,5 +1,6 @@
 use crate::program_instruction::ProgramInstruction;
 use crate::program_instruction::ProgramInstruction::*;
+use cr_cpu_common::constants::get_id_from_reg_name;
 use cr_cpu_common::instruction::Instruction;
 use cr_cpu_common::prelude::Cpu;
 use std::collections::HashMap;
@@ -7,14 +8,11 @@ use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use cr_cpu_common::constants::SP;
-use cr_cpu_common::instruction::Instruction::IMoveL;
 
 /// ProgramFile represents a single file of assembly that can be built into a cpu struct
 pub struct ProgramFile {
     lines: Vec<String>,
     labels: HashMap<String, u32>,
-    variables: HashMap<String, (u32, u32)>,
     output_path: PathBuf,
     cpu: Cpu,
 }
@@ -31,14 +29,9 @@ impl ProgramFile {
                 s.split('\n').map(|line| line.to_string()).collect()
             },
             labels: HashMap::new(),
-            variables: Default::default(),
             output_path,
             cpu: Cpu::new(),
         })
-    }
-
-    fn get_variable_count(&self) -> usize {
-        self.lines.iter().filter(|item| is_variable(item)).count()
     }
 
     /// Create a program file struct from just a program binary
@@ -46,7 +39,6 @@ impl ProgramFile {
         Ok(Self {
             lines: vec![],
             labels: Default::default(),
-            variables: Default::default(),
             output_path: path.clone(),
             cpu: Cpu::from_binary(path)?,
         })
@@ -108,19 +100,13 @@ impl ProgramFile {
             } else if is_label(line.get(0).unwrap()) {
                 // if a given line is a label, add it as an instruction to the list, so we can count it later
                 instructions.push(Label(line.get(0).unwrap().to_string()));
-            } else if is_variable(line.get(0).unwrap()) && line.len() == 4 {
-                // let a = 5
-                instructions.push(Variable(line.get(1).unwrap().to_string(),line.get(3).unwrap().parse().unwrap()))
             } else {
                 match (line.get(0), line.get(1)) {
                     (Some(l1), Some(l2)) => {
                         if let Some((inst, label)) = is_jump(l1, l2) {
                             // PreAsm is an instruction that represents another instruction that is going to be formed by the compiler
                             // at the moment, a jump instruction that contains a label will become a preasm instruction
-                            instructions.push(JumpLabel(inst, label));
-                        }
-                        if let Some((a,b)) = is_lea(l1,l2) {
-                            instructions.push(LeaLabel(a,b));
+                            instructions.push(PreAsm(inst, label));
                         }
                     }
                     (_, _) => {
@@ -145,16 +131,7 @@ impl ProgramFile {
                         self.labels
                             .insert(label.to_string().replace(':', ""), inst_index);
                     }
-                    JumpLabel(_, _) => {
-                        inst_index += 1;
-                    }
-                    Variable(lab, val) => {
-                        // inst_index += 1;
-                        let sp = self.cpu.push_variable(*val);
-                        self.variables.insert(lab.to_string(),(*val, sp));
-
-                    }
-                    LeaLabel(_, _) => {
+                    PreAsm(_, _) => {
                         inst_index += 1;
                     }
                 }
@@ -170,16 +147,13 @@ impl ProgramFile {
             };
 
             // final pass on instructions, adding them as needed to the cpu dram.
-            // self.cpu.reset_sp();
-            let variable_count = self.get_variable_count();
-            instructions.insert(0,Asm(IMoveL(SP,Cpu::default().get_sp() + variable_count as u32)));
             for (_, inst) in instructions.clone().into_iter().enumerate() {
                 match inst {
                     Asm(inst) => {
                         println!("{0:?} : {1}", inst, hex_text(&inst));
                         self.cpu.add_to_end(&inst);
                     }
-                    JumpLabel(mut jmp_inst, jump_label) => {
+                    PreAsm(mut jmp_inst, jump_label) => {
                         let label_line_num = *self.labels.get(jump_label.as_str()).unwrap() as u16;
                         // only consider the line numbers preceding the label to check for added lines
                         let final_added_lines = added_lines(
@@ -193,14 +167,6 @@ impl ProgramFile {
                     }
                     Label(label_text) => {
                         println!("LABEL: \'{label_text}\'");
-                    }
-                    Variable(name, value) => {
-                        println!("Variable: {name} {value}");
-                    }
-                    LeaLabel(mut lea_inst, val) => {
-                        let (val,sp) = *self.variables.get(val.as_str()).unwrap();
-                        lea_inst.change_lea(sp as u16);
-                        self.cpu.add_to_end(&lea_inst);
                     }
                 }
             }
@@ -231,11 +197,6 @@ fn is_label(item: &str) -> bool {
     item.starts_with(':') && item.ends_with(':')
 }
 
-/// line starts with 'let'
-fn is_variable(item: &str) -> bool {
-    item.starts_with("let")
-}
-
 /// Returns true if a given line and secondary line item is a jump instruction
 fn is_jump(item: &str, label: &str) -> Option<(Instruction, String)> {
     // item.eq("jmp") || item.eq("jlt") || item.eq("jgt") || item.eq("jov")
@@ -252,26 +213,6 @@ fn is_jump(item: &str, label: &str) -> Option<(Instruction, String)> {
         | Instruction::JLT(_)
         | Instruction::JZ(_)
         | Instruction::JOV(_) => {
-            // do nothing, since the instruction is as expected!
-        }
-        _ => {
-            return None;
-        }
-    }
-
-    Some((inst, label.to_string()))
-}
-
-fn is_lea(item: &str, label: &str) -> Option<(Instruction, String)> {
-    // item.eq("jmp") || item.eq("jlt") || item.eq("jgt") || item.eq("jov")
-    // || item.eq("jz") || item.eq("je")
-
-    // we add code line 1000 as a temporary value, since we overwrite it later in compilation anyway.
-    // we also use 0 added lines, since that will also be overwritten
-    let inst = Instruction::from_code_line(&vec![item.to_string(), "1000".to_string()], 0)?;
-
-    match inst {
-        Instruction::Lea(_) => {
             // do nothing, since the instruction is as expected!
         }
         _ => {

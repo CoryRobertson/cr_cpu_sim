@@ -3,6 +3,7 @@
 /// Move register opcode
 pub const MOVER: u8 = 0x01;
 pub const IMOVEL: u8 = 0x11;
+pub const MOVEA: u8 = 0x13;
 
 pub const LEA: u8 = 0x12;
 

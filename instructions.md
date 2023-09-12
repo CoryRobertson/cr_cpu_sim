@@ -67,6 +67,19 @@ move acc or
 ```
 Copies the output register into the **acc** register
 
+Address mode:
+```
+movea 96 acc
+```
+Copies the value of acc into address 96
+
+### Load Effective Address:
+Immediate mode:
+```
+lea 96
+```
+Loads the dram value stored at address 96 and stores it in the output register
+
 ### Compare:
 All compare instructions store outputs in the form of flags (see flags section)
 
