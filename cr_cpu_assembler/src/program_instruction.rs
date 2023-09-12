@@ -2,9 +2,14 @@ use cr_cpu_common::instruction::Instruction;
 
 #[derive(Clone, Debug)]
 pub enum ProgramInstruction {
+    /// An assembly instruction
     Asm(Instruction),
-    PreAsm(Instruction, String),
+    /// PreASM is a instruction that contains a label or other name
+    /// At compile time, the instruction is replaced with a value that the string represents
+    PreAsm(Instruction, String, Option<String>),
+    /// A label definition
     Label(String),
+    Variable(String, u32),
 }
 
 // TODO: add a new program instruction, called variable

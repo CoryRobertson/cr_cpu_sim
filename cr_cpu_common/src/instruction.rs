@@ -29,7 +29,6 @@ pub enum Instruction {
     Shr(u8, u8),
 
     // TODO: bitwise AND, bitwise OR, bitwise XOR, bitwise NOT instructions
-
     /// Jump instructions, sets pc to the value given
     JE(u16),
     JMP(u16),

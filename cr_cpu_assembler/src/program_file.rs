@@ -11,10 +11,15 @@ use std::path::PathBuf;
 /// ProgramFile represents a single file of assembly that can be built into a cpu struct
 pub struct ProgramFile {
     lines: Vec<String>,
-    labels: HashMap<String, u32>,
+    /// Label is a named line number
+    labels: HashMap<String, PCReference>,
+    variables: HashMap<String, PCReference>,
     output_path: PathBuf,
     cpu: Cpu,
 }
+
+#[derive(Clone, Copy, Debug)]
+struct PCReference(u32);
 
 // TODO: compiler profiles, release mode skips compiling all dump instructions ? debug mode does not
 
@@ -28,6 +33,7 @@ impl ProgramFile {
                 s.split('\n').map(|line| line.to_string()).collect()
             },
             labels: HashMap::new(),
+            variables: Default::default(),
             output_path,
             cpu: Cpu::new(),
         })
@@ -38,6 +44,7 @@ impl ProgramFile {
         Ok(Self {
             lines: vec![],
             labels: Default::default(),
+            variables: Default::default(),
             output_path: path.clone(),
             cpu: Cpu::from_binary(path)?,
         })
@@ -99,13 +106,19 @@ impl ProgramFile {
             } else if is_label(line.get(0).unwrap()) {
                 // if a given line is a label, add it as an instruction to the list, so we can count it later
                 instructions.push(Label(line.get(0).unwrap().to_string()));
+            } else if line.get(1).unwrap().eq("=") {
+                instructions.push(Variable(
+                    line.get(0).unwrap().to_string(),
+                    line.get(2).unwrap().parse().unwrap(),
+                ));
             } else {
                 match (line.get(0), line.get(1)) {
+                    // instructions that require two items that are precompiler friendly
                     (Some(l1), Some(l2)) => {
-                        if let Some((inst, label)) = is_jump(l1, l2) {
+                        if let Some((inst, label)) = is_precompile_label_inst(l1, l2) {
                             // PreAsm is an instruction that represents another instruction that is going to be formed by the compiler
                             // at the moment, a jump instruction that contains a label will become a preasm instruction
-                            instructions.push(PreAsm(inst, label));
+                            instructions.push(PreAsm(inst, label,line.get(3).cloned()));
                         } else {
                             panic!("Unexpected item in line {}: {:?}", line_index + 1, line);
                         }
@@ -130,10 +143,14 @@ impl ProgramFile {
                     Label(label) => {
                         // labels do not increment the instruction index for memory, as we dont want them to influence line numbering
                         self.labels
-                            .insert(label.to_string().replace(':', ""), inst_index);
+                            .insert(label.to_string().replace(':', ""), PCReference(inst_index));
                     }
-                    PreAsm(_, _) => {
+                    PreAsm(_, _,_) => {
                         inst_index += 1;
+                    }
+                    Variable(name,var_value) => {
+                        let location = self.cpu.push_variable(*var_value);
+                        self.variables.insert(name.to_string(),PCReference(location));
                     }
                 }
             }
@@ -154,20 +171,47 @@ impl ProgramFile {
                         println!("{0:?} : {1}", inst, hex_text(&inst));
                         self.cpu.add_to_end(&inst);
                     }
-                    PreAsm(mut jmp_inst, jump_label) => {
-                        let label_line_num = *self.labels.get(jump_label.as_str()).unwrap() as u16;
-                        // only consider the line numbers preceding the label to check for added lines
-                        let final_added_lines = added_lines(
-                            &instructions.as_slice()[0..(label_line_num as usize)].to_vec(),
-                        ) as u16;
-                        // changing this to allow for other assembly instructions to be considered preasm would probably require
-                        // checking the instruction type first
-                        jmp_inst.change_jump_line(label_line_num + final_added_lines);
-                        self.cpu.add_to_end(&jmp_inst);
-                        println!("{0:?} : {1}", jmp_inst, hex_text(&jmp_inst));
+                    PreAsm(mut inst_precomp, inst_label,opt_arg) => {
+                        match inst_precomp {
+                            Instruction::JMP(_)
+                            | Instruction::JE(_)
+                            | Instruction::JGT(_)
+                            | Instruction::JLT(_)
+                            | Instruction::JZ(_)
+                            | Instruction::JOV(_) => {
+                                let label_line_num = self.labels.get(inst_label.as_str()).unwrap().0 as u16;
+                                // only consider the line numbers preceding the label to check for added lines
+                                let final_added_lines = added_lines(
+                                    &instructions.as_slice()[0..(label_line_num as usize)].to_vec(),
+                                ) as u16;
+                                // changing this to allow for other assembly instructions to be considered preasm would probably require
+                                // checking the instruction type first
+                                inst_precomp.change_jump_line(label_line_num + final_added_lines);
+                                self.cpu.add_to_end(&inst_precomp);
+                                println!("{0:?} : {1}", inst_precomp, hex_text(&inst_precomp));
+                            }
+                            Instruction::Lea(_) | Instruction::LeaR(_) => {
+                                self.cpu.add_to_end(&Instruction::Lea(self.variables.get(inst_label.as_str()).unwrap().0 as u16));
+                            }
+                            Instruction::MoveA(_,_) => {
+                                match opt_arg {
+                                    None => {}
+                                    Some(arg) => {
+                                        compile_error!() // continue here
+                                        // arg needs to be converted into a register id, then made into a MoveA instruction, the location to go to is the instruction lable variable
+                                        //self.cpu.add_to_end(&Instruction::MoveA(self.variables.get(inst_label.as_str()).unwrap().0 as u16,))
+                                    }
+                                }
+
+                            }
+                            _ => {}
+                        }
                     }
                     Label(label_text) => {
                         println!("LABEL: \'{label_text}\'");
+                    }
+                    Variable(_,_) => {
+                        // self.cpu.add_to_end(&Instruction::IPushL(var_value));
                     }
                 }
             }
@@ -198,11 +242,9 @@ fn is_label(item: &str) -> bool {
     item.starts_with(':') && item.ends_with(':')
 }
 
-/// Returns true if a given line and secondary line item is a jump instruction
-fn is_jump(item: &str, label: &str) -> Option<(Instruction, String)> {
-    // item.eq("jmp") || item.eq("jlt") || item.eq("jgt") || item.eq("jov")
-    // || item.eq("jz") || item.eq("je")
-
+/// Returns true if a given line and secondary line item is a valid instruction, outputs the label if so.
+/// This function is to be used to write pre-compiler instructions
+fn is_precompile_label_inst(item: &str, label: &str) -> Option<(Instruction, String)> {
     // we add code line 1000 as a temporary value, since we overwrite it later in compilation anyway.
     // we also use 0 added lines, since that will also be overwritten
     let inst = Instruction::from_code_line(&vec![item.to_string(), "1000".to_string()], 0)?;
@@ -213,7 +255,8 @@ fn is_jump(item: &str, label: &str) -> Option<(Instruction, String)> {
         | Instruction::JGT(_)
         | Instruction::JLT(_)
         | Instruction::JZ(_)
-        | Instruction::JOV(_) => {
+        | Instruction::JOV(_)
+        | Instruction::LeaR(_) | Instruction::Lea(_) | Instruction::MoveA(_, ..) => {
             // do nothing, since the instruction is as expected!
         }
         _ => {

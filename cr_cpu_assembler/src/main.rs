@@ -1,6 +1,8 @@
 use crate::program_file::ProgramFile;
+use cr_cpu_common::instruction::Instruction;
 use std::fs::File;
 use std::path::PathBuf;
+use std::time::Instant;
 use std::{env, fs};
 
 mod program_file;
@@ -8,6 +10,7 @@ mod program_instruction;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    let start = Instant::now();
     if args.len() == 1 {
         // default compile and run code.cr -> code.bin
         #[cfg(debug_assertions)]
@@ -38,4 +41,8 @@ fn main() {
         pf.compile();
         pf.output_binary();
     }
+    let end = Instant::now();
+
+    let dur = end.duration_since(start);
+    println!("Compile took {:.2} seconds", dur.as_secs_f32());
 }
