@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::constants::{
     get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL,
     ISUB, LEA, LEAR, MOVEA, MOVER, POP, PUSH, SHL, SHR, SUB,
@@ -6,6 +7,7 @@ use crate::instruction::Instruction::{
     Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Pop,
     Push, Shl, Shr, Sub, Unknown, JE, JMP, JOV, JZ,
 };
+use crate::PCReference;
 use crate::prelude::{Cmp, JGT, JLT};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -179,7 +181,7 @@ impl Instruction {
         }
     }
 
-    pub fn from_code_line(line: &Vec<String>, added_lines: u32) -> Option<Self> {
+    pub fn from_code_line(line: &Vec<String>, added_lines: u32, map: &HashMap<String, PCReference>) -> Option<Self> {
         let uncap_line = line.get(0).unwrap().to_lowercase();
         match uncap_line.as_str() {
             // TODO: use https://crates.io/crates/eval eval crate here when parsing numbers so we can allow for expressions
@@ -324,15 +326,20 @@ impl Instruction {
                     return if let Ok(number) = line.get(1)?.parse::<u16>() {
                         Some(Lea(number))
                     } else {
-                        let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
-                        Some(LeaR(reg0id))
-                    };
+                        let var_pc = map.get(line.get(1)?)?;
+                        Some(Lea(var_pc.0 as u16))
+                    }
                 }
             }
             "movea" => {
                 if line.len() == 3 {
                     let reg0id: u8 = get_id_from_reg_name(line.get(2)?)?;
-                    return Some(MoveA(line.get(1)?.parse().ok()?, reg0id));
+                    return if let Ok(number) = line.get(1)?.parse::<u16>() {
+                        Some(MoveA(number, reg0id))
+                    } else {
+                        let var_pc = map.get(line.get(1)?)?;
+                        Some(MoveA(var_pc.0 as u16, reg0id))
+                    }
                 }
             }
             "shr" => {

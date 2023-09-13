@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use cr_cpu_common::PCReference;
 
 /// ProgramFile represents a single file of assembly that can be built into a cpu struct
 pub struct ProgramFile {
@@ -18,8 +19,7 @@ pub struct ProgramFile {
     cpu: Cpu,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct PCReference(u32);
+
 
 // TODO: compiler profiles, release mode skips compiling all dump instructions ? debug mode does not
 
@@ -99,6 +99,7 @@ impl ProgramFile {
             let inst_opt = Instruction::from_code_line(
                 &line,
                 added_lines(&instructions[0..line_index].to_vec()),
+                &self.variables,
             );
             if let Some(inst) = inst_opt {
                 // add an instruction to the compiler list so we can compile it later
@@ -111,6 +112,8 @@ impl ProgramFile {
                     line.get(0).unwrap().to_string(),
                     line.get(2).unwrap().parse().unwrap(),
                 ));
+                let location = self.cpu.push_variable(line.get(2).unwrap().parse::<u32>().unwrap());
+                self.variables.insert(line.get(0).unwrap().to_string(),PCReference(location));
             } else {
                 match (line.get(0), line.get(1)) {
                     // instructions that require two items that are precompiler friendly
@@ -148,9 +151,8 @@ impl ProgramFile {
                     PreAsm(_, _,_) => {
                         inst_index += 1;
                     }
-                    Variable(name,var_value) => {
-                        let location = self.cpu.push_variable(*var_value);
-                        self.variables.insert(name.to_string(),PCReference(location));
+                    Variable(_,_) => {
+                        // nothing to do here at the moment
                     }
                 }
             }
@@ -190,28 +192,14 @@ impl ProgramFile {
                                 self.cpu.add_to_end(&inst_precomp);
                                 println!("{0:?} : {1}", inst_precomp, hex_text(&inst_precomp));
                             }
-                            Instruction::Lea(_) | Instruction::LeaR(_) => {
-                                self.cpu.add_to_end(&Instruction::Lea(self.variables.get(inst_label.as_str()).unwrap().0 as u16));
-                            }
-                            Instruction::MoveA(_,_) => {
-                                match opt_arg {
-                                    None => {}
-                                    Some(arg) => {
-                                        compile_error!() // continue here
-                                        // arg needs to be converted into a register id, then made into a MoveA instruction, the location to go to is the instruction lable variable
-                                        //self.cpu.add_to_end(&Instruction::MoveA(self.variables.get(inst_label.as_str()).unwrap().0 as u16,))
-                                    }
-                                }
-
-                            }
                             _ => {}
                         }
                     }
                     Label(label_text) => {
                         println!("LABEL: \'{label_text}\'");
                     }
-                    Variable(_,_) => {
-                        // self.cpu.add_to_end(&Instruction::IPushL(var_value));
+                    Variable(name,val) => {
+                        println!("Variable: {name} : {val}");
                     }
                 }
             }
@@ -247,7 +235,7 @@ fn is_label(item: &str) -> bool {
 fn is_precompile_label_inst(item: &str, label: &str) -> Option<(Instruction, String)> {
     // we add code line 1000 as a temporary value, since we overwrite it later in compilation anyway.
     // we also use 0 added lines, since that will also be overwritten
-    let inst = Instruction::from_code_line(&vec![item.to_string(), "1000".to_string()], 0)?;
+    let inst = Instruction::from_code_line(&vec![item.to_string(), "1000".to_string()], 0,&HashMap::default())?;
 
     match inst {
         Instruction::JMP(_)
@@ -255,8 +243,7 @@ fn is_precompile_label_inst(item: &str, label: &str) -> Option<(Instruction, Str
         | Instruction::JGT(_)
         | Instruction::JLT(_)
         | Instruction::JZ(_)
-        | Instruction::JOV(_)
-        | Instruction::LeaR(_) | Instruction::Lea(_) | Instruction::MoveA(_, ..) => {
+        | Instruction::JOV(_) => {
             // do nothing, since the instruction is as expected!
         }
         _ => {

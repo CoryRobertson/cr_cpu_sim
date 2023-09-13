@@ -11,6 +11,9 @@ pub mod prelude {
     pub use crate::interpret;
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct PCReference(pub u32);
+
 pub fn mask_bit_group(input: u32, group: u8) -> u8 {
     assert!((0..=3).contains(&(group as i32)));
     ((input & 0xFF << (group * 8)) >> (group * 8)) as u8
