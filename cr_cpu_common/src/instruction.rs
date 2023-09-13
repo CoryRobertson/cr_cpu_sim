@@ -218,7 +218,9 @@ impl Instruction {
                 // immediate move long
                 if line.len() == 3 {
                     let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
-                    return Some(IMoveL(reg0id, line.get(2)?.parse().ok()?));
+                    let num = line.get(2)?.parse().ok()?;
+                    assert_ne!(num, 0, "imovel does not support 0 values");
+                    return Some(IMoveL(reg0id, num));
                 }
             }
             "sub" => {

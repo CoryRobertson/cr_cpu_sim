@@ -7,6 +7,8 @@ use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use cr_cpu_common::constants::SP;
+use cr_cpu_common::instruction::Instruction::IMoveL;
 use cr_cpu_common::PCReference;
 
 /// ProgramFile represents a single file of assembly that can be built into a cpu struct
@@ -68,7 +70,7 @@ impl ProgramFile {
         let mut instructions: Vec<ProgramInstruction> = vec![];
 
         // local function to determine the number of added lines given multiline instructions
-        let added_lines = |list: &Vec<ProgramInstruction>| -> u32 {
+        let added_lines = |list: &Vec<ProgramInstruction>, var_list_len: usize| -> u32 {
             list.iter()
                 .filter_map(|inst| match inst {
                     Asm(inst) => Some(inst),
@@ -77,7 +79,7 @@ impl ProgramFile {
                 .map(|inst| inst.to_instruction_data().len() as u32)
                 .filter(|len| *len > 1)
                 .map(|len| len - 1)
-                .sum()
+                .sum::<u32>() + var_list_len as u32
         };
 
         // iterate through every program line, filtering as needed
@@ -98,7 +100,7 @@ impl ProgramFile {
         {
             let inst_opt = Instruction::from_code_line(
                 &line,
-                added_lines(&instructions[0..line_index].to_vec()),
+                added_lines(&instructions[0..line_index].to_vec(), self.variables.len()),
                 &self.variables,
             );
             if let Some(inst) = inst_opt {
@@ -121,7 +123,7 @@ impl ProgramFile {
                         if let Some((inst, label)) = is_precompile_label_inst(l1, l2) {
                             // PreAsm is an instruction that represents another instruction that is going to be formed by the compiler
                             // at the moment, a jump instruction that contains a label will become a preasm instruction
-                            instructions.push(PreAsm(inst, label,line.get(3).cloned()));
+                            instructions.push(PreAsm(inst, label));
                         } else {
                             panic!("Unexpected item in line {}: {:?}", line_index + 1, line);
                         }
@@ -148,7 +150,7 @@ impl ProgramFile {
                         self.labels
                             .insert(label.to_string().replace(':', ""), PCReference(inst_index));
                     }
-                    PreAsm(_, _,_) => {
+                    PreAsm(_, _) => {
                         inst_index += 1;
                     }
                     Variable(_,_) => {
@@ -166,14 +168,21 @@ impl ProgramFile {
                     .fold("".to_string(), |a, b| format!("{a} {b:#X}"))
             };
 
+            let variable_count = self.variables.len() as u32;
+            let starting_sp = Cpu::default().get_sp() + variable_count;
+            if variable_count > 0 {
+                self.cpu.add_to_end(&IMoveL(SP,starting_sp));
+            }
+
             // final pass on instructions, adding them as needed to the cpu dram.
             for (_, inst) in instructions.clone().into_iter().enumerate() {
                 match inst {
                     Asm(inst) => {
                         println!("{0:?} : {1}", inst, hex_text(&inst));
+                        // long instructions that have the secondary argument of 0 get replaced since 0 is an empty line
                         self.cpu.add_to_end(&inst);
                     }
-                    PreAsm(mut inst_precomp, inst_label,opt_arg) => {
+                    PreAsm(mut inst_precomp, inst_label) => {
                         match inst_precomp {
                             Instruction::JMP(_)
                             | Instruction::JE(_)
@@ -184,7 +193,7 @@ impl ProgramFile {
                                 let label_line_num = self.labels.get(inst_label.as_str()).unwrap().0 as u16;
                                 // only consider the line numbers preceding the label to check for added lines
                                 let final_added_lines = added_lines(
-                                    &instructions.as_slice()[0..(label_line_num as usize)].to_vec(),
+                                    &instructions.as_slice()[0..(label_line_num as usize)].to_vec(),self.variables.len()
                                 ) as u16;
                                 // changing this to allow for other assembly instructions to be considered preasm would probably require
                                 // checking the instruction type first

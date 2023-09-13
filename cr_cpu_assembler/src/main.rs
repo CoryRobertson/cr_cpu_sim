@@ -1,5 +1,4 @@
 use crate::program_file::ProgramFile;
-use cr_cpu_common::instruction::Instruction;
 use std::fs::File;
 use std::path::PathBuf;
 use std::time::Instant;

@@ -49,6 +49,9 @@ sub acc or
 Subtracts the output register from the **acc** register, storing the outcome in **acc**
 
 ### Shift Left & Right:
+If a shift caused a bit overflow of any kind, the register is instead set to 0
+Not to be confused with an integer overflow, which would act normally.
+
 Register mode:
 ```
 shl acc 2
@@ -72,6 +75,7 @@ Immediate mode:
 imovel acc 400
 ```
 Moves 400 dec into the **acc** register
+The number moved can not be 0
 
 Register mode:
 ```
@@ -83,6 +87,14 @@ Address mode:
 ```
 movea 96 acc
 ```
+
+Variable mode:
+```
+myvariable = 15
+movea myvariable acc
+```
+Copies the value of acc into myvariable
+
 Copies the value of acc into address 96
 
 ### Load Effective Address:

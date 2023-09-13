@@ -500,14 +500,14 @@ impl Cpu {
                 self.print_inpr_reg();
                 let ir = self.ir;
                 let reg = self.get_reg(mask_bit_group(self.ir, 1));
-                *reg <<= mask_bit_group(ir, 2);
+                *reg = reg.checked_shl(mask_bit_group(ir, 2) as u32).unwrap_or(0);
                 self.zero_flag = *reg == 0;
             }
             Shr(_, _) => {
                 self.print_inpr_reg();
                 let ir = self.ir;
                 let reg = self.get_reg(mask_bit_group(self.ir, 1));
-                *reg >>= mask_bit_group(ir, 2);
+                *reg = reg.checked_shr(mask_bit_group(ir, 2) as u32).unwrap_or(0);
                 self.zero_flag = *reg == 0;
             }
         }
@@ -656,7 +656,7 @@ impl Cpu {
                     IMoveL(_, _) | ICmpL(_, _) => {
                         format!(
                             "{} {}",
-                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
+                            get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap_or("UNKNOWN".to_string()),
                             self.dram.get(index + 1).unwrap()
                         )
                     }
@@ -702,7 +702,7 @@ impl Cpu {
                     }
                     // single register only parse group
                     Push(_) | DumpR(_) | LeaR(_) => get_name_from_reg_id(mask_bit_group(*data, 1))
-                        .unwrap()
+                        .unwrap_or("UNKNOWN".to_string())
                         .to_string(),
                     MoveA(_, _) => {
                         format!(
