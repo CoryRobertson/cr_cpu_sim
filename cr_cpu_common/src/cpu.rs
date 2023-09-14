@@ -110,6 +110,7 @@ impl Cpu {
         file.read_to_end(&mut buf).unwrap();
         let mut iter = buf.iter();
         let mut i = 0;
+        #[allow(clippy::while_let_loop)]
         loop {
             if let Some(op_code) = iter.next() {
                 if let Some(g1) = iter.next() {
