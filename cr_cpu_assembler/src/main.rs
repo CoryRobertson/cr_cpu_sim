@@ -2,7 +2,9 @@ use crate::program_file::ProgramFile;
 use std::fs::File;
 use std::path::PathBuf;
 use std::time::Instant;
-use std::{env, fs};
+use std::{env};
+#[cfg(debug_assertions)]
+use std::fs;
 
 mod program_file;
 mod program_instruction;
@@ -17,6 +19,8 @@ fn main() {
         let mut pf = ProgramFile::new("code.cr".into(), "code.bin".into()).unwrap();
         // if a binary exists, run it, else create one from the code file
         if File::open("code.bin").is_ok() {
+            println!("Running code.bin");
+            pf.read_binary().unwrap();
             pf.run_binary();
         } else {
             pf.compile();
