@@ -45,6 +45,8 @@ pub struct Cpu {
     /// Ram, also used as stack memory
     dram: [u32; DRAM_SIZE as usize],
 
+    //TODO: add vram, which is most likely 320*180 in size, each value being 12 bit values for 12 bit color also make a viewer application to go with this?
+
     zero_flag: bool,
     lt_flag: bool,
     gt_flag: bool,
