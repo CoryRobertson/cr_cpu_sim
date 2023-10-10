@@ -50,7 +50,7 @@ pub struct Cpu {
     gt_flag: bool,
     eq_flag: bool,
     ov_flag: bool,
-    // TODO: stack memory ? heap memory?
+    // TODO: heap memory?
     // TODO: flags?
 }
 
