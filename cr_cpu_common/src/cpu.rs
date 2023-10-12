@@ -45,7 +45,8 @@ pub struct Cpu {
     /// Ram, also used as stack memory
     dram: [u32; DRAM_SIZE as usize],
 
-    //TODO: add vram, which is most likely 320*180 in size, each value being 12 bit values for 12 bit color also make a viewer application to go with this?
+    // TODO: add vram, which is most likely 320*180 in size, each value being 12 bit values for 12 bit color also make a viewer application to go with this?
+    // TODO: also add a vram2 or buffer_vram or frame_buffer which is same size, but is used to draw frames using a flip system, this would include a single flag that notes which buffer is meant to be displayed
 
     zero_flag: bool,
     lt_flag: bool,
