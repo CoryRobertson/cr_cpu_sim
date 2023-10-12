@@ -7,3 +7,8 @@ edition = "2021"
 
 [dependencies]
 cr_cpu_common = { path = "../cr_cpu_common" }
+pixels = "0.13.0"
+winit = "0.28.7"
+winit_input_helper = "0.14.1"
+env_logger = "0.10.0"
+log = "0.4.20"
