@@ -3,6 +3,10 @@
 /// Move register opcode
 pub const MOVER: u8 = 0x01;
 pub const IMOVEL: u8 = 0x11;
+
+pub const ISTOREVR: u8 = 0xA9;
+pub const ISTOREDR: u8 = 0xAA;
+
 pub const MOVEA: u8 = 0x13;
 
 /// Load effective address
@@ -74,6 +78,7 @@ pub const IR: u8 = 0x2A;
 pub const OR: u8 = 0x3A;
 pub const SP: u8 = 0x4A;
 pub const TR: u8 = 0x5A;
+pub const VR: u8 = 0x7A;
 
 /// Using a name, get the id of a register if there is one
 /// Used in the compiler to determine what the user intends when they specify a register
@@ -86,6 +91,7 @@ pub fn get_id_from_reg_name(name: &str) -> Option<u8> {
         "SP" => Some(SP),
         "TR" => Some(TR),
         "CR" => Some(CR),
+        "VR" => Some(VR),
         _ => None,
     }
 }
@@ -101,6 +107,7 @@ pub fn get_name_from_reg_id(id: u8) -> Option<String> {
         SP => Some("SP".to_string()),
         TR => Some("TR".to_string()),
         CR => Some("CR".to_string()),
+        VR => Some("VR".to_string()),
         _ => {
             if id != 0 {
                 dbg!(id);

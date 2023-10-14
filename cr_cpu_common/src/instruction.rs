@@ -1,8 +1,5 @@
 use std::collections::HashMap;
-use crate::constants::{
-    get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL,
-    ISUB, LEA, LEAR, MOVEA, MOVER, POP, PUSH, SHL, SHR, SUB,
-};
+use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL, ISUB, LEA, LEAR, MOVEA, MOVER, POP, PUSH, SHL, SHR, SUB, ISTOREVR, ISTOREDR};
 use crate::instruction::Instruction::{
     Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Pop,
     Push, Shl, Shr, Sub, Unknown, JE, JMP, JOV, JZ,
@@ -16,6 +13,12 @@ pub enum Instruction {
     MoveR(u8, u8),
     /// move item 1 into register in item 0
     IMoveL(u8, u32),
+
+    // TODO: IStoreVR(u32, u8) stores u8 into given index in vram
+    IStoreVR(u32,u8),
+
+    // IStoreDR(u32,u8),
+    // TODO: IStoreDR(u16,u32) stores given u32 into index u16 in dram
 
     /// Move register into dram address
     MoveA(u16, u8),
@@ -178,6 +181,12 @@ impl Instruction {
             Instruction::Shr(reg, amnt) => {
                 vec![(SHR as u32 | (*reg as u32) << 8) | (*amnt as u32) << 16]
             }
+            Instruction::IStoreVR(loc, val) => {
+                vec![ISTOREVR as u32 | (*val as u32) << 8, *loc]
+            }
+            // Instruction::IStoreDR(loc, val) => {
+            //     vec![ISTOREDR as u32 | (*val as u32) << 8, *loc]
+            // }
         }
     }
 

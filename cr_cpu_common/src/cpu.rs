@@ -1,9 +1,6 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{
-    Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, Lea, LeaR, MoveA, MoveR,
-    Push, Shl, Shr, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ,
-};
+use crate::instruction::Instruction::{Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Push, Shl, Shr, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ, IStoreVR};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
@@ -236,6 +233,8 @@ impl Cpu {
             LEAR => LeaR(0),
             SHL => Shl(0, 0),
             SHR => Shr(0, 0),
+            ISTOREVR => IStoreVR(0,0),
+            // ISTOREDR => IStoreDR(0,0),
             _ => Unknown,
         }
     }
@@ -320,6 +319,14 @@ impl Cpu {
             LeaR(_) => LeaR(group1),
             Shl(_, _) => Shl(group1, group2),
             Shr(_, _) => Shr(group1, group2),
+            IStoreVR(_, _) => {
+                self.fetch_value_tr();
+                IStoreVR(self.tr,group1)
+            }
+            // IStoreDR(_, _) => {
+            //     self.fetch_value_tr();
+            //     IStoreDR(self.tr,group1)
+            // }
         }
     }
 
@@ -521,6 +528,16 @@ impl Cpu {
                 *reg = reg.checked_shr(mask_bit_group(ir, 2) as u32).unwrap_or(0);
                 self.zero_flag = *reg == 0;
             }
+            IStoreVR(_, _) => {
+                let val = mask_bit_group(self.ir,1);
+                let loc = self.tr;
+                *self.vram_buffer.get_mut(loc as usize).unwrap() = val;
+            }
+            // IStoreDR(_, _) => {
+            //     let val = mask_bit_group(self.ir,1);
+            //     let loc = self.tr;
+            //     *self.dram.get_mut(loc as usize).unwrap() = val;
+            // }
         }
         println!();
     }
@@ -729,6 +746,9 @@ impl Cpu {
                             get_name_from_reg_id(mask_bit_group(*data, 1)).unwrap(),
                             mask_bit_group(*data, 2)
                         )
+                    }
+                    IStoreVR(loc, val) => {
+                        format!("{} {}", loc, val)
                     }
                 };
 
