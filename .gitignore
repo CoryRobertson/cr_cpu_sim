@@ -14,3 +14,7 @@ Cargo.lock
 *.pdb
 /code.bin
 /code.cr
+/annotated
+/callgrind.out.8087
+/flamegraph.svg
+/perf.data

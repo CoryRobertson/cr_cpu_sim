@@ -45,6 +45,8 @@ pub struct Cpu {
     /// Ram, also used as stack memory
     dram: [u32; DRAM_SIZE as usize],
 
+    vram_buffer: [u8 ; VRAM_SIZE as usize],
+
     // TODO: add vram, which is most likely 320*180 in size, each value being 12 bit values for 12 bit color also make a viewer application to go with this?
     // TODO: also add a vram2 or buffer_vram or frame_buffer which is same size, but is used to draw frames using a flip system, this would include a single flag that notes which buffer is meant to be displayed
 
@@ -77,6 +79,7 @@ impl Cpu {
             sp: DRAM_SIZE - (DRAM_SIZE / 4),
             tr: EMPTY_REGISTER,
             dram: EMPTY_DRAM,
+            vram_buffer: EMPTY_VRAM,
             zero_flag: false,
             lt_flag: false,
             gt_flag: false,
@@ -87,6 +90,10 @@ impl Cpu {
 
     pub fn get_dram(&self) -> &[u32] {
         &self.dram
+    }
+
+    pub fn get_vram(&self) -> &[u8] {
+        &self.vram_buffer
     }
 
     pub fn push_variable(&mut self, value: u32) -> u32 {

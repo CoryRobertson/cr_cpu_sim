@@ -15,30 +15,34 @@ const SCREEN_HEIGHT: u32 = 144;
 /// The state of the emulator including its emulation methods and functions
 struct EmuState {
     // TODO: add a cpu to be emulated, and read its vram, then render it to the screen.
+    cpu: Cpu,
 }
 
 impl EmuState {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            cpu: Default::default()
+        }
     }
 
     pub fn update(&mut self) {
 
+        // self.cpu.execute_cycles(1);
+
     }
 
     pub fn draw(&self, frame: &mut [u8]) {
+
+        let mut vram_iter = self.cpu.get_vram().chunks(3).enumerate();
+
         for (i,pixel) in frame.chunks_exact_mut(4).enumerate() {
+            let (index,vram_rgb) = vram_iter.next().unwrap_or_default();
             let rgba = {
-                if i & 1 == 0 {
-                    [255, 111, 50, 255]
-                } else {
-                    [111, 255, 80, 100]
-                }
+                [*vram_rgb.get(0).unwrap(), *vram_rgb.get(1).unwrap(), *vram_rgb.get(2).unwrap(), 255]
             };
             pixel.copy_from_slice(&rgba);
         }
     }
-
 }
 
 fn log_error<E: std::error::Error + 'static>(fn_name: &str, err: E) {
