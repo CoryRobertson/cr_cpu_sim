@@ -15,7 +15,10 @@ pub enum Instruction {
     IMoveL(u8, u32),
 
     // TODO: IStoreVR(u32, u8) stores u8 into given index in vram
+    //  This needs two more u8 inputs for a full color :P should be easy to implement
     IStoreVR(u32,u8),
+
+    // TODO: StoreVR allow a register to be used as a location on screen ?
 
     // IStoreDR(u32,u8),
     // TODO: IStoreDR(u16,u32) stores given u32 into index u16 in dram
@@ -194,6 +197,9 @@ impl Instruction {
         let uncap_line = line.get(0).unwrap().to_lowercase();
         match uncap_line.as_str() {
             // TODO: use https://crates.io/crates/eval eval crate here when parsing numbers so we can allow for expressions
+
+            // TODO: when processing IStoreVR, possible add constants that go directly to a color? e.g. 'red' becomes 255,20,20 or something like that
+
             "add" => {
                 // add immediate
                 if line.len() == 2 {
