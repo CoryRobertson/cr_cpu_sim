@@ -121,6 +121,7 @@ impl ProgramFile {
                     // instructions that require two items that are precompiler friendly
                     (Some(l1), Some(l2)) => {
                         if let Some((inst, label)) = is_precompile_label_inst(l1, l2) {
+                            // FIXME: when a label instruction is right after of a multi line instruction, it jumps to the multi line instead of the instruction after the label
                             // PreAsm is an instruction that represents another instruction that is going to be formed by the compiler
                             // at the moment, a jump instruction that contains a label will become a preasm instruction
                             instructions.push(PreAsm(inst, label));
