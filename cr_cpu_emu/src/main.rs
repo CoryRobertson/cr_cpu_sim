@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use log::error;
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
@@ -5,12 +6,13 @@ use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
+use cr_cpu_common::constants::{VRAM_HEIGHT, VRAM_WIDTH};
 
 #[allow(unused_imports)]
 use cr_cpu_common::prelude::*;
 
-const SCREEN_WIDTH: u32 = 240;
-const SCREEN_HEIGHT: u32 = 144;
+const SCREEN_WIDTH: u32 = VRAM_WIDTH;
+const SCREEN_HEIGHT: u32 = VRAM_HEIGHT;
 
 /// The state of the emulator including its emulation methods and functions
 struct EmuState {
@@ -21,7 +23,7 @@ struct EmuState {
 impl EmuState {
     pub fn new() -> Self {
         Self {
-            cpu: Default::default()
+            cpu: Cpu::from_binary(PathBuf::from("code.bin")).unwrap()
         }
     }
 
@@ -59,7 +61,7 @@ fn main() {
     // cpu.add_to_end(&Dump);
     //
     // cpu.execute_until_unknown();
-    env_logger::init();
+    // env_logger::init();
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
     let window = {
@@ -95,6 +97,9 @@ fn main() {
             if input.key_pressed(VirtualKeyCode::Escape) || input.close_requested() {
                 *control_flow = ControlFlow::ExitWithCode(0);
                 return;
+            }
+            if input.key_pressed(VirtualKeyCode::Space) {
+               state.cpu.execute_cycles(1);
             }
             // TODO: pass input to the cpu if/when we need to.
         }

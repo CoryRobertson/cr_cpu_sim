@@ -42,9 +42,9 @@ pub struct Cpu {
     /// Ram, also used as stack memory
     dram: [u32; DRAM_SIZE as usize],
 
-    vram_buffer: [u8 ; VRAM_SIZE as usize],
+    /// VRAM Buffer, stored in a box because stack size is not big enough on windows atleast, will test on fedora linux soon
+    vram_buffer: Box<[u8 ; VRAM_SIZE as usize]>,
 
-    // TODO: add vram, which is most likely 320*180 in size, each value being 12 bit values for 12 bit color also make a viewer application to go with this?
     // TODO: also add a vram2 or buffer_vram or frame_buffer which is same size, but is used to draw frames using a flip system, this would include a single flag that notes which buffer is meant to be displayed
 
     zero_flag: bool,
@@ -76,7 +76,7 @@ impl Cpu {
             sp: DRAM_SIZE - (DRAM_SIZE / 4),
             tr: EMPTY_REGISTER,
             dram: EMPTY_DRAM,
-            vram_buffer: EMPTY_VRAM,
+            vram_buffer: Box::from(EMPTY_VRAM),
             zero_flag: false,
             lt_flag: false,
             gt_flag: false,
@@ -90,7 +90,7 @@ impl Cpu {
     }
 
     pub fn get_vram(&self) -> &[u8] {
-        &self.vram_buffer
+        &self.vram_buffer.as_slice()
     }
 
     pub fn push_variable(&mut self, value: u32) -> u32 {
@@ -233,7 +233,7 @@ impl Cpu {
             LEAR => LeaR(0),
             SHL => Shl(0, 0),
             SHR => Shr(0, 0),
-            ISTOREVR => IStoreVR(0,0),
+            ISTOREVR => IStoreVR(0,0,0,0),
             // ISTOREDR => IStoreDR(0,0),
             _ => Unknown,
         }
@@ -319,9 +319,9 @@ impl Cpu {
             LeaR(_) => LeaR(group1),
             Shl(_, _) => Shl(group1, group2),
             Shr(_, _) => Shr(group1, group2),
-            IStoreVR(_, _) => {
+            IStoreVR(_,_,_,_) => {
                 self.fetch_value_tr();
-                IStoreVR(self.tr,group1)
+                IStoreVR(self.tr,group1,group2,group3)
             }
             // IStoreDR(_, _) => {
             //     self.fetch_value_tr();
@@ -528,10 +528,19 @@ impl Cpu {
                 *reg = reg.checked_shr(mask_bit_group(ir, 2) as u32).unwrap_or(0);
                 self.zero_flag = *reg == 0;
             }
-            IStoreVR(_, _) => {
-                let val = mask_bit_group(self.ir,1);
-                let loc = self.tr;
-                *self.vram_buffer.get_mut(loc as usize).unwrap() = val;
+            IStoreVR(_,_,_,_) => {
+                let r = mask_bit_group(self.ir,1);
+                let g = mask_bit_group(self.ir,2);
+                let b = mask_bit_group(self.ir,3);
+                let loc = (self.tr * 3) as usize;
+                // self.vram_buffer.
+                self.vram_buffer[loc] = r;
+                self.vram_buffer[loc + 1] = g;
+                self.vram_buffer[loc + 2] = b;
+
+                // *self.vram_buffer.get_mut(loc as usize).unwrap() = r;
+                // *self.vram_buffer.get_mut((loc + 1) as usize).unwrap() = g;
+                // *self.vram_buffer.get_mut((loc + 2) as usize).unwrap() = b;
             }
             // IStoreDR(_, _) => {
             //     let val = mask_bit_group(self.ir,1);
@@ -747,8 +756,8 @@ impl Cpu {
                             mask_bit_group(*data, 2)
                         )
                     }
-                    IStoreVR(loc, val) => {
-                        format!("{} {}", loc, val)
+                    IStoreVR(loc, r,g,b) => {
+                        format!("{} {},{},{}", loc, r,g,b)
                     }
                 };
 

@@ -1,9 +1,6 @@
 use std::collections::HashMap;
-use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL, ISUB, LEA, LEAR, MOVEA, MOVER, POP, PUSH, SHL, SHR, SUB, ISTOREVR, ISTOREDR};
-use crate::instruction::Instruction::{
-    Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Pop,
-    Push, Shl, Shr, Sub, Unknown, JE, JMP, JOV, JZ,
-};
+use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL, ISUB, LEA, LEAR, MOVEA, MOVER, POP, PUSH, SHL, SHR, SUB, ISTOREVR, ISTOREDR, VRAM_WIDTH, VRAM_SIZE, VRAM_HEIGHT};
+use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Pop, Push, Shl, Shr, Sub, Unknown, JE, JMP, JOV, JZ, IStoreVR};
 use crate::PCReference;
 use crate::prelude::{Cmp, JGT, JLT};
 
@@ -14,9 +11,7 @@ pub enum Instruction {
     /// move item 1 into register in item 0
     IMoveL(u8, u32),
 
-    // TODO: IStoreVR(u32, u8) stores u8 into given index in vram
-    //  This needs two more u8 inputs for a full color :P should be easy to implement
-    IStoreVR(u32,u8),
+    IStoreVR(u32,u8,u8,u8),
 
     // TODO: StoreVR allow a register to be used as a location on screen ?
 
@@ -178,14 +173,14 @@ impl Instruction {
                 let inst: u32 = LEAR as u32 | (*reg as u32) << 8;
                 vec![inst]
             }
-            Instruction::Shl(reg, amnt) => {
+            Shl(reg, amnt) => {
                 vec![(SHL as u32 | (*reg as u32) << 8) | (*amnt as u32) << 16]
             }
-            Instruction::Shr(reg, amnt) => {
+            Shr(reg, amnt) => {
                 vec![(SHR as u32 | (*reg as u32) << 8) | (*amnt as u32) << 16]
             }
-            Instruction::IStoreVR(loc, val) => {
-                vec![ISTOREVR as u32 | (*val as u32) << 8, *loc]
+            Instruction::IStoreVR(loc, r,g,b) => {
+                vec![ISTOREVR as u32 | (*r as u32) << 8 | (*g as u32) << 16 | (*b as u32) << 24, *loc]
             }
             // Instruction::IStoreDR(loc, val) => {
             //     vec![ISTOREDR as u32 | (*val as u32) << 8, *loc]
@@ -371,6 +366,27 @@ impl Instruction {
                     return Some(Shl(reg0id, line.get(2)?.parse().ok()?));
                 }
             }
+            "storevr" => {
+                if line.len() == 5 {
+                    // TODO: if the line input is 6, he user most likely wrote "storevr xlocation ylocation r g b", which should also work by mathing out the index from the x and y given
+                    let loc: u32 = line.get(1)?.parse().ok()?;
+                    let r: u8 = line.get(2)?.parse().ok()?;
+                    let g: u8 = line.get(3)?.parse().ok()?;
+                    let b: u8 = line.get(4)?.parse().ok()?;
+                    return Some(IStoreVR(loc,r,g,b));
+                }
+                if line.len() == 6 {
+                    let x: u32 = line.get(1)?.parse().ok()?;
+                    let y: u32 = line.get(2)?.parse().ok()?;
+                    // TODO: this clamp from 1 to VRAM_SIZE should actually be from 0 to VRAM_SIZE, how ever, the cpu when placing instructions places them in memory by looking for a zero, when it should really interpret the previous instruction and skip accordingly
+                    let loc = ((x).clamp(0,VRAM_WIDTH) + (VRAM_WIDTH)*(y).clamp(0,VRAM_HEIGHT)).clamp(1,VRAM_SIZE);
+                    let r: u8 = line.get(3)?.parse().ok()?;
+                    let g: u8 = line.get(4)?.parse().ok()?;
+                    let b: u8 = line.get(5)?.parse().ok()?;
+                    return Some(IStoreVR(loc,r,g,b));
+                }
+            }
+
             _ => {}
         }
         // ipush

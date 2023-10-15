@@ -67,7 +67,10 @@ pub const EMPTY_REGISTER: u32 = 0x00;
 pub const EMPTY_INPUT_REGISTER: u8 = 0x00;
 pub const EMPTY_DRAM: [u32; DRAM_SIZE as usize] = [0x00; DRAM_SIZE as usize];
 pub const DRAM_SIZE: u32 = 128;
-pub const VRAM_SIZE: u32 = 240*144*3;
+
+pub const VRAM_WIDTH: u32 = 240;
+pub const VRAM_HEIGHT: u32 = 144;
+pub const VRAM_SIZE: u32 = VRAM_WIDTH*VRAM_HEIGHT*3;
 pub const EMPTY_VRAM: [u8; VRAM_SIZE as usize] = [0x00; VRAM_SIZE as usize];
 
 // Register identifiers
