@@ -378,8 +378,7 @@ impl Instruction {
                 if line.len() == 6 {
                     let x: u32 = line.get(1)?.parse().ok()?;
                     let y: u32 = line.get(2)?.parse().ok()?;
-                    // TODO: this clamp from 1 to VRAM_SIZE should actually be from 0 to VRAM_SIZE, how ever, the cpu when placing instructions places them in memory by looking for a zero, when it should really interpret the previous instruction and skip accordingly
-                    let loc = ((x).clamp(0,VRAM_WIDTH) + (VRAM_WIDTH)*(y).clamp(0,VRAM_HEIGHT)).clamp(1,VRAM_SIZE);
+                    let loc = ((x).clamp(0,VRAM_WIDTH) + (VRAM_WIDTH)*(y).clamp(0,VRAM_HEIGHT)).clamp(0,VRAM_SIZE);
                     let r: u8 = line.get(3)?.parse().ok()?;
                     let g: u8 = line.get(4)?.parse().ok()?;
                     let b: u8 = line.get(5)?.parse().ok()?;

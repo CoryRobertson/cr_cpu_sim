@@ -156,8 +156,11 @@ impl Cpu {
     /// Add an instruction to the first available space in dram,
     /// checking for if the instruction size can fit
     pub fn add_to_end(&mut self, inst: &Instruction) {
+        let mut prev_inst = 0x0;
         for (index, inst_dram) in self.dram.clone().iter().enumerate() {
-            if *inst_dram == 0x0 {
+            let decoded_prev_inst = Cpu::decode_inst(mask_bit_group(prev_inst,0));
+            if *inst_dram == 0x0 && decoded_prev_inst.to_instruction_data().len() == 1 { // this is hacky, it will probably only work for instruction lengths of 2 to skip properly, how ever it works for now :P
+
                 // if the instruction read is 0x0 allow the program to put that instruction into this memory address
                 let inst_list = inst.to_instruction_data();
                 // boolean value which checks if the input instruction fits into the space of memory found, if it does not, keep searching
@@ -174,9 +177,11 @@ impl Cpu {
                     for (add_index, ins) in inst_list.iter().enumerate() {
                         self.add_instruction(*ins, (index + add_index) as u32);
                     }
+                    prev_inst = *inst_dram;
                     break;
                 }
             }
+            prev_inst = *inst_dram;
         }
     }
 
