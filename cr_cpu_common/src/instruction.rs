@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL, ISUB, LEA, LEAR, MOVEA, MOVER, POP, PUSH, SHL, SHR, SUB, ISTOREVR, ISTOREDR, VRAM_WIDTH, VRAM_SIZE, VRAM_HEIGHT};
-use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Pop, Push, Shl, Shr, Sub, Unknown, JE, JMP, JOV, JZ, IStoreVR};
+use crate::constants::{get_id_from_reg_name, ADD, CMP, DUMP, DUMPR, IADD, IADDL, ICMP, ICMPL, IMOVEL, IPUSH, IPUSHL, ISUB, LEA, LEAR, MOVEA, MOVER, POP, PUSH, SHL, SHR, SUB, ISTOREVR, VRAM_WIDTH, VRAM_SIZE, VRAM_HEIGHT, FLIP};
+use crate::instruction::Instruction::{Add, Dump, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPush, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Pop, Push, Shl, Shr, Sub, Unknown, JE, JMP, JOV, JZ, Flip, IStoreVR};
 use crate::PCReference;
 use crate::prelude::{Cmp, JGT, JLT};
 
@@ -14,6 +14,8 @@ pub enum Instruction {
     IStoreVR(u32,u8,u8,u8),
 
     // TODO: StoreVR allow a register to be used as a location on screen ?
+
+    Flip, // TODO: clear frame buffer when flipping dis
 
     // IStoreDR(u32,u8),
     // TODO: IStoreDR(u16,u32) stores given u32 into index u16 in dram
@@ -185,6 +187,9 @@ impl Instruction {
             // Instruction::IStoreDR(loc, val) => {
             //     vec![ISTOREDR as u32 | (*val as u32) << 8, *loc]
             // }
+            Flip => {
+                vec![FLIP as u32]
+            }
         }
     }
 
@@ -364,6 +369,11 @@ impl Instruction {
                 if line.len() == 3 {
                     let reg0id: u8 = get_id_from_reg_name(line.get(1)?)?;
                     return Some(Shl(reg0id, line.get(2)?.parse().ok()?));
+                }
+            }
+            "flip" => {
+                if line.len() == 1 {
+                    return Some(Flip);
                 }
             }
             "storevr" => {

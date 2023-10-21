@@ -35,10 +35,10 @@ impl EmuState {
 
     pub fn draw(&self, frame: &mut [u8]) {
 
-        let mut vram_iter = self.cpu.get_vram().chunks(3).enumerate();
+        let mut vram_iter = self.cpu.get_frame().chunks(3).enumerate();
 
-        for (i,pixel) in frame.chunks_exact_mut(4).enumerate() {
-            let (index,vram_rgb) = vram_iter.next().unwrap_or_default();
+        for (_,pixel) in frame.chunks_exact_mut(4).enumerate() {
+            let (_,vram_rgb) = vram_iter.next().unwrap_or_default();
             let rgba = {
                 [*vram_rgb.get(0).unwrap(), *vram_rgb.get(1).unwrap(), *vram_rgb.get(2).unwrap(), 255]
             };
