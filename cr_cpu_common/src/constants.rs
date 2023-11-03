@@ -7,6 +7,8 @@ pub const IMOVEL: u8 = 0x11;
 pub const ISTOREVR: u8 = 0xA9;
 pub const ISTOREDR: u8 = 0xAA;
 
+pub const FLIP: u8 = 0xA8;
+
 pub const MOVEA: u8 = 0x13;
 
 /// Load effective address
@@ -67,6 +69,9 @@ pub const EMPTY_REGISTER: u32 = 0x00;
 pub const EMPTY_INPUT_REGISTER: u8 = 0x00;
 pub const EMPTY_DRAM: [u32; DRAM_SIZE as usize] = [0x00; DRAM_SIZE as usize];
 pub const DRAM_SIZE: u32 = 128;
+pub const FRAME_BUFFER_LENGTH: usize = 2;
+
+pub const EMPTY_FRAME_BUFFER: [[u8; VRAM_SIZE as usize]; FRAME_BUFFER_LENGTH] = [EMPTY_VRAM; FRAME_BUFFER_LENGTH];
 
 pub const VRAM_WIDTH: u32 = 240;
 pub const VRAM_HEIGHT: u32 = 144;

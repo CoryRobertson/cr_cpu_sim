@@ -1,6 +1,6 @@
 use crate::constants::*;
 use crate::instruction::Instruction;
-use crate::instruction::Instruction::{Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Push, Shl, Shr, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ, IStoreVR};
+use crate::instruction::Instruction::{Add, Cmp, Dump, DumpR, IAdd, IAddL, ICmp, ICmpL, IMoveL, IPushL, ISub, Lea, LeaR, MoveA, MoveR, Push, Shl, Shr, Sub, Unknown, JE, JGT, JLT, JMP, JOV, JZ, IStoreVR, Flip};
 use crate::mask_bit_group;
 use crate::prelude::{IPush, Pop};
 use std::cmp::Ordering;
@@ -42,8 +42,9 @@ pub struct Cpu {
     /// Ram, also used as stack memory
     dram: [u32; DRAM_SIZE as usize],
 
-    /// VRAM Buffer, stored in a box because stack size is not big enough on windows atleast, will test on fedora linux soon
-    vram_buffer: Box<[u8 ; VRAM_SIZE as usize]>,
+    frame_buffer: [[u8 ; VRAM_SIZE as usize] ; 2],
+
+    frame_buffer_index: usize,
 
     // TODO: also add a vram2 or buffer_vram or frame_buffer which is same size, but is used to draw frames using a flip system, this would include a single flag that notes which buffer is meant to be displayed
 
@@ -76,7 +77,8 @@ impl Cpu {
             sp: DRAM_SIZE - (DRAM_SIZE / 4),
             tr: EMPTY_REGISTER,
             dram: EMPTY_DRAM,
-            vram_buffer: Box::from(EMPTY_VRAM),
+            frame_buffer: EMPTY_FRAME_BUFFER,
+            frame_buffer_index: 0,
             zero_flag: false,
             lt_flag: false,
             gt_flag: false,
@@ -89,8 +91,12 @@ impl Cpu {
         &self.dram
     }
 
-    pub fn get_vram(&self) -> &[u8] {
-        &self.vram_buffer.as_slice()
+    // pub fn get_vram(&self) -> &[u8] {
+    //     &self.frame_buffer[self.frame_buffer_index]
+    // }
+
+    pub fn get_frame(&self) -> &[u8] {
+        &self.frame_buffer[self.frame_buffer_index]
     }
 
     pub fn push_variable(&mut self, value: u32) -> u32 {
@@ -240,6 +246,7 @@ impl Cpu {
             SHR => Shr(0, 0),
             ISTOREVR => IStoreVR(0,0,0,0),
             // ISTOREDR => IStoreDR(0,0),
+            FLIP => Flip,
             _ => Unknown,
         }
     }
@@ -327,6 +334,9 @@ impl Cpu {
             IStoreVR(_,_,_,_) => {
                 self.fetch_value_tr();
                 IStoreVR(self.tr,group1,group2,group3)
+            }
+            Flip => {
+                return Flip;
             }
             // IStoreDR(_, _) => {
             //     self.fetch_value_tr();
@@ -539,9 +549,9 @@ impl Cpu {
                 let b = mask_bit_group(self.ir,3);
                 let loc = (self.tr * 3) as usize;
                 // self.vram_buffer.
-                self.vram_buffer[loc] = r;
-                self.vram_buffer[loc + 1] = g;
-                self.vram_buffer[loc + 2] = b;
+                self.frame_buffer[self.frame_buffer_index][loc] = r;
+                self.frame_buffer[self.frame_buffer_index][loc + 1] = g;
+                self.frame_buffer[self.frame_buffer_index][loc + 2] = b;
 
                 // *self.vram_buffer.get_mut(loc as usize).unwrap() = r;
                 // *self.vram_buffer.get_mut((loc + 1) as usize).unwrap() = g;
@@ -552,6 +562,9 @@ impl Cpu {
             //     let loc = self.tr;
             //     *self.dram.get_mut(loc as usize).unwrap() = val;
             // }
+            Flip => {
+                self.frame_buffer_index = if self.frame_buffer_index == 0 { 1 } else { 0 } ;
+            }
         }
         println!();
     }
@@ -763,6 +776,9 @@ impl Cpu {
                     }
                     IStoreVR(loc, r,g,b) => {
                         format!("{} {},{},{}", loc, r,g,b)
+                    }
+                    Flip => {
+                        format!("")
                     }
                 };
 
