@@ -87,15 +87,17 @@ impl Cpu {
         }
     }
 
+
+    pub fn get_acc(&self) -> u32 { self.acc }
+    pub fn get_pc(&self) -> u32 { self.pc }
+    pub fn get_or(&self) -> u32 { self.or }
+    pub fn get_tr(&self) -> u32 { self.tr }
+
     pub fn get_dram(&self) -> &[u32] {
         &self.dram
     }
 
-    // pub fn get_vram(&self) -> &[u8] {
-    //     &self.frame_buffer[self.frame_buffer_index]
-    // }
-
-    pub fn get_frame(&self) -> &[u8] {
+    pub fn get_current_frame_buffer(&self) -> &[u8] {
         &self.frame_buffer[self.frame_buffer_index]
     }
 

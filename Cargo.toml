@@ -2,3 +2,7 @@
 members = ["cr_cpu_emu","cr_cpu_assembler","cr_cpu_common"]
 
 resolver = "2"
+
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3

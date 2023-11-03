@@ -1,0 +1,15 @@
+---
+source: cr_cpu_common/tests/cpu_tests.rs
+expression: non_zero
+---
+[
+    50,
+    122,
+    200,
+    79,
+    2,
+    150,
+    200,
+    200,
+    78,
+]

@@ -58,6 +58,7 @@ pub enum Instruction {
     Sub(u8, u8),
     /// Push number to stack
     IPush(u16),
+    /// Push a register value to the stack
     Push(u8),
     /// Push long number to stack
     IPushL(u32),

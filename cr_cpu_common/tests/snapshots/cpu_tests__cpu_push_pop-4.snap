@@ -1,0 +1,5 @@
+---
+source: cr_cpu_common/tests/cpu_tests.rs
+expression: cpu.get_pc()
+---
+5
